@@ -92,6 +92,27 @@ test('Verificación rechaza pagos reales, de otro vendedor, otra referencia, mon
   }
   assert.equal((await f.records.list({prefix:'payment-practice-results/'})).blobs.length,0);
 });
+test('El diagnóstico distingue cada diferencia sin revelar respuestas privadas ni quitar controles',async()=>{
+  const f=await fixture(),body=f.startBody();await f.start(body);
+  const cases=[
+    [{id:999},'MP_IDENTIFICACION'],
+    [{collector_id:456},'MP_VENDEDOR'],
+    [{external_reference:'private-unrelated-reference'},'MP_REFERENCIA'],
+    [{currency_id:'USD'},'MP_MONEDA'],
+    [{transaction_amount:1},'MP_IMPORTE'],
+    [{live_mode:true},'MP_ENTORNO'],
+    [{live_mode:null},'MP_ENTORNO']
+  ];
+  for(const [changes,code] of cases){
+    f.setPayment(body.key,{...changes,payer:{email:'private-payer@example.test'}});
+    const result=await f.verify(body.key);assert.equal(result.status,409);assert.ok(result.data.error.includes('['+code+']'));
+    for(const sensitive of ['private-payer@example.test','private-unrelated-reference',f.config.MERCADOPAGO_ACCESS_TOKEN])assert.ok(!JSON.stringify(result.data).includes(sensitive));
+  }
+  f.setPayment(body.key,{live_mode:true,transaction_amount:1});const result=await f.verify(body.key);
+  assert.ok(result.data.error.includes('[MP_ENTORNO]'));assert.ok(result.data.error.includes('[MP_IMPORTE]'));
+  assert.equal((await f.records.list({prefix:'payment-practice-results/'})).blobs.length,0);
+  assert.equal((await f.records.list({prefix:'orders/'})).blobs.length,0);
+});
 test('Pago de prueba aprobado y verificación repetida no descuentan prendas ni crean pedidos',async()=>{
   const f=await fixture(),before=await f.products(),body=f.startBody();await f.start(body);f.setPayment(body.key);
   assert.equal((await f.verify(body.key)).data.status,'approved');assert.equal((await f.verify(body.key)).status,200);
