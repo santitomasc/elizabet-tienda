@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer">
+  <link rel="icon" href="/favicon.svg"><link rel="stylesheet" href="/style.css">
+  <title>Resultado de la práctica · Mercado Pago</title>
+  <style>body{background:#f6f3ed}main{max-width:620px;margin:8vh auto;padding:32px 24px}h1{font-size:clamp(30px,7vw,46px);line-height:1.15;margin:20px 0}p{margin:20px 0;line-height:1.7}input{width:100%;font-size:16px;padding:14px;margin:12px 0}button{width:100%}.links{display:flex;gap:20px;flex-wrap:wrap;margin-top:32px}.form-error{min-height:24px}</style>
+</head>
+<body><main>
+  <div class="eyebrow">MERCADO PAGO · SOLO PRÁCTICA</div>
+  <h1 id="resultTitle">Verificá el resultado.</h1>
+  <p id="resultCopy">Consultamos el pago directamente a Mercado Pago. El resultado se verifica al tocar el botón; el mensaje de la dirección del navegador no confirma un pago.</p>
+  <p>La práctica no crea pedidos de venta ni modifica el stock.</p>
+  <form id="verifyForm">
+    <label for="paymentId">Número del pago de prueba</label><input id="paymentId" inputmode="numeric" pattern="[0-9]{1,30}" maxlength="30" required>
+    <p class="fineprint">Se completa al volver desde Mercado Pago. Si está vacío, copiá el número del pago que muestra Mercado Pago al terminar.</p>
+    <p id="resultError" class="form-error" role="alert"></p>
+    <button id="verifyButton" class="button dark" type="submit">Verificar en Mercado Pago →</button>
+  </form>
+  <p id="verifiedResult" role="status" aria-live="polite"></p>
+  <div class="links"><a href="/admin" target="_blank" rel="noopener">Ingresar a mi panel ↗</a><a href="/?practica=1#coleccion">Volver a la tienda ↗</a></div>
+  <p class="fineprint">Si abriste el pago en incógnito, ingresá también al panel en esa misma ventana antes de verificar. No ingreses claves de Mercado Pago en este sitio.</p>
+</main><script src="/practice-result.js?v=1"></script></body>
+</html>

@@ -1,0 +1,30 @@
+ELI · CÓMO PROBAR TU TIENDA AZUL BENDITO
+
+La tienda está en presentación. Podés probarla sin hacer pagos.
+Las prendas, precios y talles de ejemplo se reemplazan por tus productos.
+
+1. Recorré la portada y cambiá las fotos con las flechas del carrusel.
+2. Abrí el menú y probá las secciones del catálogo.
+3. Tocá una prenda, elegí un talle y agregala al carrito.
+4. Abrí el carrito, cambiá cantidades y eliminá una prenda.
+5. Mirá Instagram, WhatsApp, el contacto y Cómo llegar al local.
+
+PARA CARGAR TUS PRODUCTOS
+Una vez publicada la actualización, Santiago te pasa el enlace del panel y
+el acceso por privado. Ingresá a Mis productos → Agregar producto.
+Subí fotos, escribí nombre y precio, elegí sección y completá talles y stock.
+Guardá y actualizá la tienda para ver el resultado.
+También podés dejar una prenda oculta mientras la preparás.
+
+En Mi marca podés revisar tus datos y subir la foto del local.
+Dejá Habilitar pedidos desactivado durante esta prueba.
+El formulario de contacto se prueba después de configurar su recepción en
+Netlify; en el HTML descargable solo muestra una demostración.
+
+CONTANOS QUÉ TE PARECE
+¿Te resulta fácil encontrar una prenda y agregarla al carrito?
+¿Te resulta cómodo subir fotos, elegir sección y poner precio desde el panel?
+¿Cambiarías algún color, texto, fotografía u orden de las secciones?
+
+Cuando apruebes esta etapa, preparamos Mercado Pago para ventas reales con
+tu cuenta comercial y las condiciones de pago que elijas.

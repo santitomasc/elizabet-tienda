@@ -1,0 +1,80 @@
+AZUL BENDITO · NUEVA IDENTIDAD VISUAL
+
+PARA VER LA PROPUESTA
+Abrí AZUL_Bendito_Ver_Diseno.html con Chrome. Esta vista incluye las fotos y permite recorrer la colección, cambiar imágenes de portada, probar talles y sumar prendas al carrito. No realiza pagos ni crea pedidos. Los productos, talles y precios visibles son los de muestra del proyecto; se reemplazan por el catálogo real desde el panel.
+
+QUÉ CAMBIA
+Nombre visible y descripción de la marca, logo, paleta azul/turquesa/arena, tipografía, portada con carrusel, fotos aportadas por la marca, textos y detalles inspirados en el mar. El logo de cabecera es una reconstrucción provisional de la captura: conviene reemplazarlo por el archivo original antes de publicar la identidad definitiva. Las dos fotos individuales y la imagen grupal se conservan sin retocar modelos ni prendas. La imagen del mar es de ambientación.
+
+PARA APLICARLO EN LA TIENDA EXISTENTE
+1. Conservá una copia de tu repositorio antes de actualizarlo.
+2. Descomprimí este ZIP.
+3. En GitHub, abrí santitomasc/elizabet-tienda, en su pantalla principal.
+4. Add file → Upload files. Arrastrá las carpetas public, lib y tests de esta actualización, manteniendo las carpetas y los nombres.
+5. Commit changes. Netlify construirá la actualización.
+6. Esperá que el despliegue más reciente diga Published. Abrí la tienda y actualizá con Ctrl + F5.
+
+Se actualizan public/index.html, public/admin.html y lib/shop.mjs, y se agregan los archivos de diseño, secciones y contacto. El cambio en lib/shop.mjs permite guardar el teléfono y la foto del local desde Mi marca. No se reemplazan app.js, payment-practice.js, style.css, las Functions, las variables de entorno ni los archivos de datos. Los productos, fotos cargadas por el panel, precios, stock, pedidos y configuración continúan en tu tienda. Esta actualización visual no activa cobros reales.
+
+NOMBRE EN EL PANEL
+En Administrar tienda → Datos de mi marca, guardá:
+Nombre: AZUL bendito
+Frase: Moda en talles grandes para mujeres reales
+Mensaje superior: Moda en talles grandes · Todos los estilos, tu forma de ser
+Sobre tu marca: AZUL bendito es moda en talles grandes para mujeres reales. Nos inspiran el mar, su calma y esa sensación de libertad que queremos llevar a cada look.
+La nueva portada reconoce el nombre ELIZABET de la muestra y muestra AZUL bendito automáticamente mientras completás estos datos. Los mensajes y textos personalizados del panel se conservan.
+
+SECCIONES DE ELI
+Short/polleras · Short de jean · Remeras · Jeans · Verano · Blusas/camisas · Tops · Abrigo · Pantalones · Accesorios · Bodys · Vestidos · Zapatos 40-43.
+Estas secciones aparecen como círculos en el catálogo, aunque todavía no tengan productos. Cuando hay prendas, la foto de la primera prenda de esa sección se usa como portada del círculo. Las secciones vacías muestran un ícono.
+
+PARA CARGAR UNA PRENDA
+1. Entrar al panel de administradora de la tienda.
+2. Agregar producto.
+3. Escribir nombre, precio y elegir Sección de la tienda.
+4. Subir las fotos, completar talles y stock y dejar Publicado activado.
+5. Guardar producto. La prenda aparece en su sección sin subir archivos a GitHub.
+Para mover una prenda: Editar → cambiar la sección → Guardar.
+El panel también permite filtrar productos por sección. Las categorías antiguas de muestra Camisas y Abrigos se presentan como Blusas/camisas y Abrigo; el jean ilustrativo se agrupa en Jeans. No se borran productos ni se cambian precios o cantidades.
+
+INSTAGRAM
+Se agregó el enlace público https://www.instagram.com/azulbendito.tallesgrandes/.
+En Datos de mi marca también se sugiere ese usuario para guardarlo. La web toma como referencia la organización de las destacadas. Cargar un producto en el panel actualiza la web; no publica historias de Instagram ni importa sus historias automáticamente.
+
+CONTACTO Y LOCAL FÍSICO
+Dirección confirmada: 8 de Junio 822, Concepción del Uruguay, Entre Ríos, Argentina.
+WhatsApp de la captura: +54 3442 408895.
+Teléfono de la captura: 03442 408895.
+Correo de la captura: benditoazul5@gmail.com.
+Instagram: @azulbendito.tallesgrandes.
+Los datos se pueden editar en Administrar tienda → Mi marca. Se agregó un botón flotante de WhatsApp y enlaces directos a correo, teléfono, Instagram y Cómo llegar en Google Maps. Los datos de la vieja dirección de Herrera no se usan.
+
+FOTO REAL DEL LOCAL
+Administrar tienda → Mi marca → Mostrá tu local → Foto del local → elegir foto → Guardar cambios.
+Se acepta JPG, PNG o WebP de hasta 5 MB y se optimiza la foto antes de subirla. La foto se guarda con las imágenes de la tienda y aparece junto a la dirección. Mientras no se cargue una foto real, se muestra una placa de la marca; no se presenta una foto de otro negocio como si fuera el local.
+
+FORMULARIO DE CONTACTO
+Está preparado como formulario estático para Netlify Forms, con nombre contacto-azul-bendito, protección honeypot, nombre, email, teléfono opcional y mensaje. No necesita poner claves en el navegador.
+ANTES DE PUBLICAR:
+1. En el proyecto elicdu de Netlify: Forms → Enable form detection.
+2. Subir esta actualización a GitHub y esperar el nuevo Published. Si ya estaba subida, realizar un nuevo despliegue después de activar la detección.
+3. En Forms debe aparecer contacto-azul-bendito.
+4. Para recibir avisos en el correo de Eli: Forms → Submission notifications → Add notification → Email notification. Elegir contacto-azul-bendito y benditoazul5@gmail.com.
+5. Enviar una consulta real de prueba desde la tienda publicada y comprobar que aparece en Forms y llega la notificación antes de darlo por activo.
+La vista HTML descargable no envía consultas: muestra un aviso de demostración. La recepción real del formulario solo se puede verificar después del despliegue y de activar Forms.
+Documentación: https://docs.netlify.com/manage/forms/setup/ y https://docs.netlify.com/manage/forms/notifications/.
+
+CARTEL DE CUOTAS
+Se agregó el texto 3 cuotas sin interés en un recuadro con fondo blanco al 40% de opacidad, equivalente a 60% de transparencia; el texto conserva opacidad completa.
+El cartel es parte del diseño. No cambia la configuración de pagos ni activa financiación. Antes de anunciar la promoción a compradoras, la cuenta de cobro de la marca debe tener habilitada esa financiación y sus condiciones. No se activan pagos reales con esta actualización.
+
+ENVÍOS
+Se agregó Envíos a todo el país, con costos y plazos a consultar. No se inventan tarifas ni horarios del local.
+
+DIRECCIÓN DE NETLIFY
+El nombre visible cambia a AZUL bendito. La dirección elicdu.netlify.app no se cambia con estos archivos; el dominio se configura aparte.
+
+REVISIÓN
+Se verificaron la compilación, el carrusel, la validación de talle, el agregado al carrito, el menú móvil y los filtros. Se conservó el código de compras y guardado de la tienda. Se revisaron el selector de sección del panel y el guardado de un producto de prueba. La publicación en Netlify la realiza el titular del proyecto.
+
+Diseño por CdU Digital.
