@@ -57,6 +57,20 @@ test('Fotos, CRUD y validación de productos con revisión',async()=>{
   assert.equal((await req('/api/admin/products/'+p.id,'PUT',{...latest,variants:[{size:'S',stock:1},{size:'s',stock:1}]})).r.status,400);
   assert.equal((await req('/api/admin/products/'+p.id,'DELETE',{revision:latest.revision})).r.status,200);assert.equal(await find(p.id),undefined);
 });
+test('Contacto y foto del local se guardan con sesión, sin alterar productos; se bloquean URLs externas',async()=>{
+  const {req,catalog}=fixture(),before=await catalog();
+  const img=new Uint8Array(readFileSync('public/assets/shirt.jpg')),upload=await req('/api/admin/upload','POST',img);
+  const fields={phone:'+54 3442 408895',storePhoto:upload.data.url,address:'8 de Junio 822, Concepción del Uruguay',email:'benditoazul5@gmail.com'};
+  assert.equal((await req('/api/admin/settings','PUT',fields,{auth:false})).r.status,401);
+  assert.equal((await req('/api/admin/settings','PUT',fields,{origin:'https://otra.test'})).r.status,403);
+  const saved=await req('/api/admin/settings','PUT',fields);assert.equal(saved.r.status,200);
+  assert.equal(saved.data.settings.phone,'543442408895');assert.equal(saved.data.settings.storePhoto,upload.data.url);
+  const visible=(await req('/api/catalog')).data.settings;assert.equal(visible.storePhoto,upload.data.url);assert.equal(visible.address,fields.address);
+  for(const photo of ['https://otra.test/local.jpg','javascript:alert(1)','/media/no-es-una-foto'])assert.equal((await req('/api/admin/settings','PUT',{storePhoto:photo})).r.status,400);
+  assert.equal((await req('/api/admin/settings','PUT',{phone:'123'})).r.status,400);
+  assert.equal((await req('/api/admin/settings','PUT',{storePhoto:''})).data.settings.storePhoto,'');
+  assert.deepEqual(await catalog(),before);
+});
 test('Confirmar descuenta por talle una sola vez; cancelar repone una sola vez',async()=>{
   const {req,add,place,status,find}=fixture();const p=await add(5,{variants:[{size:'M',stock:5},{size:'L',stock:8}]});
   const id=await place([{id:p.id,size:'M',qty:2}]);assert.equal((await find(p.id)).stock,13);

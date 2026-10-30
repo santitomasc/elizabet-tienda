@@ -17,7 +17,7 @@ class MemoryStore {
 }
 const baseConfig = {ADMIN_USER:'practice-admin',ADMIN_PASSWORD_HASH:'pbkdf2$600000$'+'a'.repeat(32)+'$'+'b'.repeat(64),SESSION_SECRET:randomBytes(48).toString('hex'),MERCADOPAGO_ACCESS_TOKEN:'APP_USR-fake-test-fixture-only'};
 async function fixture(extra={}) {
-  const records=new MemoryStore(), config={...baseConfig,...extra}, calls=[], state={test:true,site:'MLA',payment:{},invalidUrl:false,fail:false};
+  const records=new MemoryStore(), config={...baseConfig,...extra}, calls=[], state={test:true,site:'MLA',payment:{},invalidUrl:false,fail:false,buyer:{id:456,site_id:'MLA',tags:['normal']},buyerStatus:200};
   const product={id:randomUUID(),name:'Remera de prueba',active:true,sample:true,price:18000,category:'Remeras',photos:['/assets/shirt.jpg'],variants:[{size:'M',stock:5}]};
   await records.setJSON('products/'+product.id,product);await records.setJSON('settings/initialized',true);
   const shop=createShop({records,photos:new MemoryStore(),config});
@@ -25,6 +25,7 @@ async function fixture(extra={}) {
   const fetcher=async(url,options)=> {
     calls.push({url,options}); if(state.fail) return Response.json({message:config.MERCADOPAGO_ACCESS_TOKEN},{status:401});
     if(url.endsWith('/users/me'))return Response.json({id:123,site_id:state.site,tags:state.test?['test_user']:['normal']});
+    if(url.startsWith('https://api.mercadolibre.com/users/'))return Response.json(state.buyer,{status:state.buyerStatus});
     if(url.endsWith('/checkout/preferences'))return Response.json({id:'pref-practice',collector_id:123,init_point:state.invalidUrl?'https://evil.test/checkout':'https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=pref-practice',sandbox_init_point:'https://sandbox.mercadopago.com/fake'});
     if(url.includes('/v1/payments/'))return Response.json(state.payment);
     throw Error('Unexpected API route');
@@ -109,9 +110,40 @@ test('El diagnóstico distingue cada diferencia sin revelar respuestas privadas 
     for(const sensitive of ['private-payer@example.test','private-unrelated-reference',f.config.MERCADOPAGO_ACCESS_TOKEN])assert.ok(!JSON.stringify(result.data).includes(sensitive));
   }
   f.setPayment(body.key,{live_mode:true,transaction_amount:1});const result=await f.verify(body.key);
-  assert.ok(result.data.error.includes('[MP_ENTORNO]'));assert.ok(result.data.error.includes('[MP_IMPORTE]'));
+  assert.ok(result.data.error.includes('[MP_IMPORTE]'));
   assert.equal((await f.records.list({prefix:'payment-practice-results/'})).blobs.length,0);
   assert.equal((await f.records.list({prefix:'orders/'})).blobs.length,0);
+});
+test('Flujo marcado normal solo se acepta si vendedor y comprador del pago son usuarios de prueba verificados',async()=>{
+  const f=await fixture(),before=await f.products(),body=f.startBody();await f.start(body);
+  f.setPayment(body.key,{live_mode:true,payer:{id:456}});f.state.buyer={id:456,site_id:'MLA',tags:['test_user']};
+  const result=await f.verify(body.key);assert.equal(result.status,200);assert.equal(result.data.status,'approved');assert.equal(result.data.verification,'verified_test_accounts');
+  assert.ok(f.calls.some(c=>c.url==='https://api.mercadolibre.com/users/456'));
+  assert.deepEqual(await f.products(),before);assert.equal((await f.records.list({prefix:'orders/'})).blobs.length,0);
+});
+test('El flujo normal rechaza compradores reales, etiquetas falsas, otro país, vendedor como comprador y datos incompletos',async()=>{
+  const f=await fixture(),body=f.startBody();await f.start(body);
+  for(const buyer of [{id:456,site_id:'MLA',tags:['normal']},{id:456,site_id:'MLA',tags:'test_user'},{id:456,site_id:'MLB',tags:['test_user']},{id:999,site_id:'MLA',tags:['test_user']},{}]){
+    f.setPayment(body.key,{live_mode:true,payer:{id:456}});f.state.buyer=buyer;assert.equal((await f.verify(body.key)).status,409);
+  }
+  for(const payer of [{id:123},{id:'456/path'},null]){
+    f.setPayment(body.key,{live_mode:true,payer});f.state.buyer={id:456,site_id:'MLA',tags:['test_user']};assert.equal((await f.verify(body.key)).status,409);
+  }
+  f.setPayment(body.key,{live_mode:null,payer:{id:456}});assert.equal((await f.verify(body.key)).status,409);
+  assert.equal((await f.records.list({prefix:'payment-practice-results/'})).blobs.length,0);
+});
+test('Si no se puede comprobar el comprador, no se aprueba la verificación ni se revela información privada',async()=>{
+  const f=await fixture(),body=f.startBody();await f.start(body);f.setPayment(body.key,{live_mode:true,payer:{id:456}});
+  f.state.buyerStatus=403;f.state.buyer={message:'private-provider-message'};const result=await f.verify(body.key);
+  assert.equal(result.status,503);assert.ok(result.data.error.includes('[MP_COMPRADOR_CONSULTA]'));assert.ok(!JSON.stringify(result).includes('private-provider-message'));
+  assert.equal((await f.records.list({prefix:'payment-practice-results/'})).blobs.length,0);
+});
+test('Comprobar las cuentas de prueba no permite saltear referencias, importes o vendedores distintos',async()=>{
+  const f=await fixture(),body=f.startBody();await f.start(body);f.state.buyer={id:456,site_id:'MLA',tags:['test_user']};
+  for(const changes of [{transaction_amount:1},{external_reference:'otra'},{collector_id:999},{id:999},{currency_id:'USD'}]){
+    f.setPayment(body.key,{live_mode:true,payer:{id:456},...changes});assert.equal((await f.verify(body.key)).status,409);
+  }
+  assert.ok(!f.calls.some(c=>c.url.startsWith('https://api.mercadolibre.com/users/')));
 });
 test('Pago de prueba aprobado y verificación repetida no descuentan prendas ni crean pedidos',async()=>{
   const f=await fixture(),before=await f.products(),body=f.startBody();await f.start(body);f.setPayment(body.key);

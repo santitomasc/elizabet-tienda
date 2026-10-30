@@ -18,11 +18,54 @@
       banner.textContent = 'Falta guardar el Access Token de prueba en Netlify y volver a publicar.';
       return;
     }
-    banner.textContent = 'PRÁCTICA DE MERCADO PAGO · Elegí prendas y abrí el carrito. Esta prueba no modifica pedidos ni stock.';
+    const dialog = $('#infoDialog'), storageKey = 'elizabet-practice-link-v2';
+    let lastLink = null;
+    function validLink(value) {
+      try {
+        const url = new URL(value?.url);
+        return Number.isFinite(value.total) && value.total > 0 && Number.isFinite(value.savedAt) && Date.now() - value.savedAt < 45 * 60000 && value.savedAt <= Date.now() && url.protocol === 'https:' && !url.username && !url.password && ['www.mercadopago.com.ar','www.mercadopago.com','mercadopago.com.ar'].includes(url.hostname);
+      } catch {return false;}
+    }
+    try {const saved = JSON.parse(sessionStorage.getItem(storageKey)); if (validLink(saved)) lastLink = saved; else sessionStorage.removeItem(storageKey);} catch {}
+    banner.innerHTML = '<span>PRÁCTICA DE MERCADO PAGO · Elegí prendas y abrí el carrito. Esta prueba no modifica pedidos ni stock.</span> <button type="button" id="recoverPracticeLink" style="display:block;margin:10px auto 0;padding:10px 18px;border:1px solid currentColor;font-weight:600" hidden>Recuperar último enlace de prueba</button>';
+    const recover = $('#recoverPracticeLink');
+    recover.hidden = !lastLink;
+    // The store normally closes dialogs on a backdrop click. A selection or a
+    // clipboard interaction must not dismiss the payment link by that handler.
+    dialog.addEventListener('click', event => {
+      if (dialog.dataset.practiceLinkReady === 'true' && event.target === dialog) event.stopImmediatePropagation();
+    }, true);
+    function showLink(result, remember = false) {
+      const saved = remember ? {...result, savedAt:Date.now()} : result;
+      if (!validLink(saved)) {recover.hidden = true; toast('El enlace venció. Prepará un nuevo pago de prueba desde el carrito.'); return;}
+      if (remember) {
+        lastLink = saved; recover.hidden = false;
+        try {sessionStorage.setItem(storageKey, JSON.stringify({url:saved.url,total:saved.total,savedAt:saved.savedAt}));} catch {}
+      }
+      dialog.dataset.practiceLinkReady = 'true';
+      $('#infoContent').innerHTML = `<div class="eyebrow">ENLACE DE PRUEBA LISTO</div><h2>Copiá tu enlace de prueba.</h2><p>Importe de prueba: <strong>${money(result.total)}</strong>.</p><p>Tocá el botón para copiar. Después abrí una ventana de incógnito con <strong>Ctrl + Shift + N</strong> y pegá el enlace con <strong>Ctrl + V</strong>.</p><button type="button" id="copyPracticeLink" class="button dark" style="width:100%;justify-content:center">COPIAR ENLACE DE PRUEBA</button><p id="copyPracticeStatus" role="status" aria-live="polite">El enlace queda disponible aunque cierres esta ventana.</p><label for="practiceLink">Enlace de prueba</label><textarea id="practiceLink" readonly rows="3" spellcheck="false" style="width:100%;font-size:14px;overflow-wrap:anywhere;resize:vertical">${esc(result.url)}</textarea><a class="button" href="${esc(result.url)}" target="_blank" rel="noopener noreferrer" style="width:100%;margin-top:12px;justify-content:center;border:1px solid currentColor">Abrir enlace en otra pestaña ↗</a><p>En Mercado Pago, ingresá con la cuenta <strong>compradora de prueba</strong> y usá una tarjeta de prueba.</p><p class="fineprint">Si se cierra esta ventana, usá “Recuperar último enlace de prueba” en la barra superior. No se creó un pedido de venta.</p>`;
+      if (!dialog.open) dialog.showModal();
+      const field = $('#practiceLink'), button = $('#copyPracticeLink'), status = $('#copyPracticeStatus');
+      field.addEventListener('click', event => event.stopPropagation());
+      field.addEventListener('pointerdown', event => event.stopPropagation());
+      button.onclick = async event => {
+        event.preventDefault(); event.stopPropagation();
+        let copied = false;
+        try {await navigator.clipboard.writeText(result.url); copied = true;} catch {
+          field.focus(); field.select();
+          try {copied = document.execCommand('copy');} catch {}
+        }
+        if (!dialog.open) dialog.showModal();
+        button.textContent = copied ? '✓ ENLACE COPIADO · COPIAR OTRA VEZ' : 'SELECCIONAR ENLACE PARA COPIAR';
+        status.textContent = copied ? 'Listo. Abrí incógnito con Ctrl + Shift + N y pegá con Ctrl + V.' : 'El navegador bloqueó la copia automática. El enlace está seleccionado: presioná Ctrl + C o mantenelo apretado y elegí Copiar.';
+      };
+    }
+    recover.onclick = event => {event.preventDefault();event.stopPropagation();if(lastLink)showLink(lastLink);};
     $('#checkoutBtn').textContent = 'Probar pago con Mercado Pago →';
     $('#checkoutBtn').onclick = function () {
       if (!cart.length) return;
       closeCart();
+      dialog.dataset.practiceLinkReady = 'false';
       let practiceKey = newKey();
       $('#infoContent').innerHTML = `<div class="eyebrow">PRÁCTICA PRIVADA</div><h2>Probá tu primera compra.</h2>${cart.map(item => {
         const p = products.find(p => p.id === item.id);
@@ -36,11 +79,7 @@
         button.textContent = 'Preparando…';
         try {
           const result = await api('/api/practice/checkout', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({key:practiceKey, items:cart.map(({id,size,qty}) => ({id,size,qty}))})});
-          $('#infoContent').innerHTML = `<div class="eyebrow">ENLACE DE PRUEBA LISTO</div><h2>Ahora, Mercado Pago.</h2><p>Importe de prueba: <strong>${money(result.total)}</strong>.</p><p>Abrí el enlace en una ventana de incógnito para evitar que entre tu cuenta personal de Mercado Pago. Ingresá con la cuenta <strong>compradora de prueba</strong>, distinta de la vendedora.</p><a class="button dark" href="${esc(result.url)}" rel="noreferrer">Abrir Mercado Pago <span>↗</span></a><button id="copyPracticeLink" class="button" style="margin-top:12px;width:100%">Copiar enlace para incógnito</button><p id="copyPracticeStatus" role="status"></p><label>Enlace de prueba<input id="practiceLink" readonly value="${esc(result.url)}" style="width:100%;font-size:13px"></label><p class="fineprint">No se creó un pedido de venta. Al finalizar, volvé al sitio para verificar el resultado.</p>`;
-          $('#copyPracticeLink').onclick = async () => {
-            try {await navigator.clipboard.writeText(result.url); $('#copyPracticeStatus').textContent = 'Enlace copiado. Pegalo en una pestaña de incógnito.';}
-            catch {$('#practiceLink').focus(); $('#practiceLink').select(); $('#copyPracticeStatus').textContent = 'Mantené apretado el enlace y elegí Copiar.';}
-          };
+          showLink(result, true);
         } catch (e) {
           $('#practiceError').textContent = e.message;
           practiceKey = newKey(); button.disabled = false; button.textContent = 'Volver a intentar →';
