@@ -1,0 +1,6 @@
+AZUL BENDITO · MERCADO PAGO ORDERS
+
+Abrí LEER_PRIMERO.html o LEER_PRIMERO.md.
+Esta versión conserva el diseño y usa Checkout Pro con API de Orders para las compras nuevas. Reemplaza la versión anterior basada en Preferencias.
+En la aplicación de Eli elegir Checkout Pro → API de Orders. En Webhooks elegir Order (Mercado Pago), no solo Pagos.
+No contiene credenciales reales. Hay que publicarla en GitHub/Netlify y conectar la cuenta de Eli antes de cobrar.

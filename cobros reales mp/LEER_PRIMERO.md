@@ -1,0 +1,111 @@
+# AZUL bendito · Mercado Pago con API de Orders
+
+Esta entrega mantiene el diseño, las secciones, los contactos, el panel y las fotos de AZUL bendito. Integra Checkout Pro mediante **API de Orders** al carrito. Esta versión reemplaza la anterior basada en API de Preferencias. Preparada y probada con respuestas simuladas; todavía no está conectada a la cuenta real ni publicada por nosotros.
+
+## 1. La cuenta de cobro es la de Eli
+
+Entrar con la cuenta de Mercado Pago donde Eli quiere recibir sus ventas. Desde https://www.mercadopago.com.ar/developers/panel seleccionar o crear una aplicación con **Checkout Pro / API de Orders**. Activar sus credenciales de producción y completar los requisitos que solicite Mercado Pago.
+
+El Access Token de producción y la firma de Webhooks son privados. No mandarlos por chat, WhatsApp, capturas ni GitHub. La Public Key no se necesita en este flujo porque la redirección la prepara el servidor.
+
+## 2. Subir esta versión a GitHub
+
+Guardar una copia del repositorio actual. Descomprimir el ZIP. Abrir el repositorio que está conectado al proyecto **azulbendito** de Netlify. En su pantalla principal: Add file / Upload files.
+
+Arrastrar el contenido de la carpeta descomprimida: **public, lib, netlify, scripts, tests, package.json, package-lock.json y netlify.toml** deben quedar directamente en la raíz. No subir otra carpeta llamada “AZUL_Bendito…” conteniendo todo adentro. Confirmar con Commit changes.
+
+No subir node_modules, archivos .env reales ni CONFIGURACION_PRIVADA.env. El archivo .env.example solo tiene nombres y valores vacíos; no contiene claves reales.
+
+No cambiar los nombres de almacenamiento ni borrar los datos de Netlify Blobs: se conserva el mismo inventario, las imágenes y los pedidos anteriores del proyecto existente. No reemplazar las tres variables que ya permiten entrar al panel: ADMIN_USER, ADMIN_PASSWORD_HASH y SESSION_SECRET.
+
+## 3. Configurar las notificaciones de Mercado Pago
+
+En la aplicación de Eli: **Webhooks → Configurar notificaciones → Modo productivo**.
+
+URL de producción:
+
+    https://azulbendito.netlify.app/api/checkout/webhook
+
+Seleccionar el evento **Order (Mercado Pago)** y guardar. El receptor procesa las notificaciones de órdenes; no seleccionar solo Pagos como en la guía anterior. Copiar la **firma secreta** que genera Mercado Pago. Si cambia el dominio de la tienda, actualizar esta URL y STORE_URL.
+
+El servidor valida la firma HMAC y consulta la orden por su ID en /v1/orders/{order_id}. No acepta el texto “approved” de la URL del navegador como prueba de cobro.
+
+## 4. Variables en Netlify
+
+Proyecto **azulbendito → Project configuration → Environment variables → Add a variable**. Cargar estos nombres exactamente:
+
+| Key | Value |
+| --- | --- |
+| MERCADOPAGO_LIVE_ACCESS_TOKEN | Access Token de **producción** de la aplicación de Eli |
+| MERCADOPAGO_WEBHOOK_SECRET | Firma secreta de los Webhooks de esa aplicación |
+| MERCADOPAGO_COLLECTOR_ID | User ID numérico de la **cuenta real vendedora** de Eli |
+| STORE_URL | https://azulbendito.netlify.app |
+| MERCADOPAGO_LIVE_ENABLED | false, durante la configuración |
+
+Marcar como secretos el Access Token y la firma. Aplicar al contexto **Production**, incluyendo Functions. Si tu plan muestra All scopes sin permitir editarlo, conservar ese valor. No hace falta comprar un plan solo para elegir scopes.
+
+MERCADOPAGO_COLLECTOR_ID no es el número de aplicación, ni el usuario comprador de prueba. Se encuentra en los datos de la cuenta vendedora / integración. El código consulta /users/me y exige que coincida con el dueño del token. No tomar como referencia el prefijo APP_USR: también aparece en credenciales de usuarios de prueba.
+
+La variable anterior **MERCADOPAGO_ACCESS_TOKEN** queda exclusivamente para la práctica. No reemplazarla por una credencial real para tratar de activar ventas. La versión real usa otro nombre para mantener los dos ambientes separados.
+
+Después de guardar, volver a desplegar: **Deploys → Trigger deploy → Deploy site**. Esperar el deploy más reciente en **Published**. Cambiar variables no actualiza las Functions de una publicación anterior.
+
+## 5. Revisar la conexión y el catálogo
+
+Abrir la tienda publicada → Administrar tienda → Mi marca. El recuadro **Mercado Pago · Orders** debe mostrar **Cuenta conectada · cobros reales todavía desactivados** con la cuenta correcta. Si informa un error, corregirlo antes de habilitar cobros.
+
+Eli carga sus prendas con foto, precio y stock real por talle. Quitar “Producto ilustrativo” solo en prendas reales. Los productos de muestra no se pueden cobrar. Las unidades que edita son las **disponibles para nuevas ventas**: las reservas de carritos ya se excluyen.
+
+Revisar WhatsApp, email, retiro, condiciones de cambios y envíos. En esta versión el envío se coordina y se paga **aparte**; la compradora lo ve antes de continuar a Mercado Pago. No hay tarifa ni etiqueta de correo automática. Si por ahora se quiere vender solo con retiro, desactivar Envío en Mi marca.
+
+## 6. Habilitar el cobro real
+
+Cuando esté todo revisado, cambiar **MERCADOPAGO_LIVE_ENABLED** a **true** en Netlify y publicar de nuevo. En el panel, Mi marca, habilitar recepción de pedidos y guardar. Debe aparecer **Cobros reales habilitados** y, en el carrito de prendas reales, **Pagar con Mercado Pago**.
+
+Desde ese momento una compra aprobada **sí cobra dinero real**, sujeto a las comisiones y condiciones de Mercado Pago. Hacer una compra controlada, con autorización del titular de la tarjeta y una cuenta compradora distinta de la vendedora. Comprobar el cobro en Mercado Pago y el estado Pago aprobado en Pedidos antes de anunciar el lanzamiento. Una eventual devolución se hace desde Mercado Pago; las comisiones y su devolución dependen de sus condiciones.
+
+No usamos ni necesitamos recibir números de tarjeta en la tienda o en el chat. Se ingresan únicamente en el checkout oficial de Mercado Pago.
+
+## Cómo funciona para Eli
+
+- Al preparar el enlace se reservan todas las prendas del carrito en una sola operación. Dos compradoras no pueden reservar la misma última unidad.
+- La orden tiene una vigencia de 30 minutos. Pasados otros 15 minutos, la conciliación solicita cancelar una orden que siga sin pagarse y consulta otra vez su estado antes de liberar el stock. Una orden ya rechazada o cancelada se libera tras verificar su estado. La tarea automática revisa lotes cada cinco minutos; la cola puede demorar más con muchos pedidos.
+- Un pago pendiente o en revisión conserva su reserva. Una consulta puede mostrar **Pago detectado · esperando notificación**: no entregar todavía. El estado **Pago aprobado** exige la consulta a la API y una notificación auténtica de Mercado Pago.
+- Cada compra tiene una clave X-Idempotency-Key guardada. Reintentar la misma solicitud recupera el enlace existente. Si se corta la respuesta de creación, se busca la orden por su referencia y fecha; no se envía una segunda creación con otra clave. Repetir una notificación no descuenta stock dos veces. Si la creación queda incierta y la API no permite recuperar su resultado, la reserva se conserva para revisión.
+- En Pedidos aparece el estado de cobro. Ver permite consultar el detalle y **Verificar pago**. Preparar o entregar no descuenta otra vez las prendas reservadas.
+- Los pedidos anteriores al cambio conservan su comportamiento manual. Su selección y sus fotos no se borran.
+- Los reembolsos, devoluciones parciales, contracargos y cobros duplicados requieren revisar la cuenta de Mercado Pago. No se devuelve dinero cambiando el estado de entrega. El stock de una compra que ya se pagó no se repone automáticamente por devolver el dinero: primero comprobar que la prenda regresó en condiciones.
+- Un pago que llegue muy tarde, después de liberar la reserva, intenta recuperar el stock de forma atómica. Si ya no está disponible, queda bloqueado para entrega y marcado para revisión y devolución; nunca se deja el stock negativo.
+
+## Medios y promociones
+
+Checkout Pro muestra los medios disponibles para la cuenta y para esa compra. Se dejan habilitados los medios de acreditación inmediata; se excluyen efectivo con cupón, cajero y transferencia bancaria diferida, y se usa modo binario. El modo binario se solicita con capture_mode=automatic; se controlan igualmente los estados de revisión y autorización sin captura, y no se permite entregar una compra que siga en esos estados.
+
+El cartel ahora dice **Pagá con Mercado Pago**. No se promete “3 cuotas sin interés”: esa promoción debe contratarse y verificarse en la cuenta de Eli. Configurar Checkout Pro no la activa por sí solo. Esta entrega no agrega un QR de caja presencial independiente ni cupones de descuento de la marca.
+
+## Operación y límites de esta base
+
+Los pagos se verifican con Webhooks y una tarea Netlify programada. Comprobar en Netlify Functions que estén publicadas **checkout** y **reconcile-payments**, y que el cron se ejecute. Los fallos de conciliación conservan las reservas para evitar vender dos veces; revisar el registro de la función si dejan de liberarse reservas.
+
+Los pedidos anteriores de la API de Preferencias siguen legibles y conservan su stock. Se mantiene un adaptador exclusivamente para consultar y confirmar compras anteriores; las compras nuevas usan /v1/orders. No se crean nuevas preferencias en el flujo real. Si ya había cobros productivos de otra aplicación, conservar sus credenciales y Webhooks hasta cerrar esos movimientos; esta entrega no migra transacciones entre cuentas ni entre aplicaciones.
+
+Las firmas de notificación se aceptan dentro de cinco minutos de su fecha, según el reloj del servidor. Si la consulta detecta un cobro y no llega una notificación válida, en la aplicación de Mercado Pago abrir Configuración de Webhooks, seleccionar Producción, revisar los envíos y reenviar el evento correspondiente. No entregar mientras el panel siga esperando esa confirmación.
+
+Esta base mantiene un inventario con escritura condicional en un documento, limitado a 4 MB y 1.500 intentos de compra guardados. Al acercarse al límite hace falta archivar registros y migrar el historial a una base adecuada; no borrar pedidos cobrados para liberar espacio. Para una operación de mayor volumen se necesita esa ampliación.
+
+Cambiar STORE_URL exige actualizar los Webhooks. Rotar SESSION_SECRET invalida comprobantes de compras anteriores y sesiones: coordinarlo con quien mantiene la tienda. Para frenar nuevas ventas se puede desactivar recepción de pedidos; las notificaciones y verificaciones de cobros anteriores siguen funcionando.
+
+## Validación realizada
+
+Compilación de archivos y pruebas automáticas con proveedor simulado: precios calculados en servidor; última unidad concurrente; credenciales de prueba y previews bloqueados para cobros reales; firmas inválidas rechazadas; comprobantes privados; aprobación, rechazo, espera y devolución; timeout recuperable; reintentos sin duplicación de stock; pedidos antiguos conservados.
+
+Se ejecutaron 43 pruebas automáticas y la compilación. El proveedor fue simulado: no se utilizaron claves reales ni se hizo un cargo. Falta la validación en Netlify con la cuenta productiva de Eli y un cobro controlado. Esta entrega no hizo ningún cobro ni cambió el sitio publicado.
+
+Documentación oficial consultada:
+- https://www.mercadopago.com.ar/developers/es/docs/checkout-pro-orders/create-order
+- https://www.mercadopago.com.ar/developers/es/docs/checkout-pro-orders/notifications
+- https://www.mercadopago.com.ar/developers/es/docs/checkout-pro-orders/web-integration/configure-back-urls
+- https://www.mercadopago.com.ar/developers/es/reference/online-payments/checkout-pro/search-orders/get
+- https://www.mercadopago.com.ar/developers/es/reference/online-payments/checkout-pro/cancel-order/post
+- https://github.com/mercadopago/sdk-nodejs/blob/master/docs/webhooks.md
+- https://docs.netlify.com/build/functions/scheduled-functions/
