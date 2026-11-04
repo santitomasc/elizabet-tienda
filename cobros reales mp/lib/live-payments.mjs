@@ -55,7 +55,11 @@ console.error('Mercado Pago API error', JSON.stringify({
   code: clean(detail.error || detail.code),
   message: clean(detail.message),
   codes: Array.isArray(detail.errors)
-    ? detail.errors.slice(0, 5).map(x => clean(x?.code))
+    ? detail.errors.slice(0, 5).map(x => ({
+    code: clean(x?.code),
+    message: clean(x?.message),
+    details: clean(JSON.stringify(x?.details ?? ''))
+  }))
     : []
 }));
 
