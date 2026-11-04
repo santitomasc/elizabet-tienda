@@ -37,7 +37,30 @@ export function createLivePayments({records, inventory, settings, config, enviro
     let response;try{response=await fetcher('https://api.mercadopago.com'+path,{...options,redirect:'error',signal:AbortSignal.timeout(Math.max(1,Math.min(8000,Math.floor(deadline-Date.now())))),headers:{...options.headers,Authorization:'Bearer '+token,'Content-Type':'application/json'}});}catch{throw new ShopError('No pudimos conectar con Mercado Pago. Conservamos tu selección. Volvé a consultar el estado en unos momentos.',502);}
     if(!response.ok){
       const e=new ShopError([401,403].includes(response.status)?'Mercado Pago no aceptó la credencial de cobro. La tienda debe revisar la configuración.':'Mercado Pago no pudo completar la consulta. Volvé a intentar.',[401,403].includes(response.status)?503:502);
-      e.providerStatus=response.status;throw e;
+      let detail = {};
+try { detail = await response.json(); } catch {}
+
+const clean = value => String(value ?? '')
+  .replaceAll(token || '__NO_TOKEN__', '[redacted]')
+  .replaceAll(secret || '__NO_SECRET__', '[redacted]')
+  .replace(/Bearer\s+\S+/gi, '[redacted]')
+  .replace(/[\w.+-]+@[\w.-]+/g, '[email]')
+  .replace(/[\r\n]/g, ' ')
+  .slice(0, 240);
+
+console.error('Mercado Pago API error', JSON.stringify({
+  method: options.method || 'GET',
+  endpoint: path.split('?')[0],
+  status: response.status,
+  code: clean(detail.error || detail.code),
+  message: clean(detail.message),
+  codes: Array.isArray(detail.errors)
+    ? detail.errors.slice(0, 5).map(x => clean(x?.code))
+    : []
+}));
+
+e.providerStatus = response.status;
+throw e;
     }
     try{return await response.json();}catch{throw new ShopError('Mercado Pago devolvió una respuesta incompleta.',502);}
   }
@@ -214,7 +237,12 @@ export function createLivePayments({records, inventory, settings, config, enviro
         for(const i of current.items){const product=data.products.find(p=>p.id===i.id);product.variants.find(v=>v.size===i.size).stock+=i.qty;product.revision=(product.revision||0)+1;}
         current.stockHeld=false;data.orders[o.id].deducted=false;
       }
-      current.paymentStatus='expired';data.orders[o.id].status='Cancelado';
+     current.paymentStatus = current.provider_status === 'failed'
+  ? 'rejected'
+  : current.provider_status === 'canceled'
+    ? 'cancelled'
+    : 'expired';
+data.orders[o.id].status = 'Cancelado';
     });
   }
   async function reconcile(id) {
