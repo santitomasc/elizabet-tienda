@@ -149,7 +149,7 @@ throw e;
       type:'online',processing_mode:'manual',capture_mode:'automatic',
       total_amount:o.total.toFixed(2),external_reference:reference(o.id),expiration_time:'PT30M',
       payer:{email:o.email},
-      items:o.items.map(i=>({external_code:i.id+':'+i.size,title:(i.name+' · Talle '+i.size).slice(0,120),quantity:i.qty,unit_price:i.price.toFixed(2)})),
+      items:o.items.map(i=>({external_code:createHash('sha256').update(i.id+':'+i.size).digest('hex').slice(0,30),title:(i.name+' · Talle '+i.size).slice(0,120),quantity:i.qty,unit_price:i.price.toFixed(2)})),
       config:{online:{success_url:back,failure_url:back,pending_url:back,auto_return:'approved'},
         payment_method:{not_allowed_types:['ticket','atm','bank_transfer']}}
     };
