@@ -276,9 +276,20 @@ data.orders[o.id].status = 'Cancelado';
     if(digits(rawId))return legacy.handle(r);
     const id=rawId?.toUpperCase(),parts=signature.split(',').map(x=>x.trim().split('=')),ts=parts.find(([k])=>k==='ts')?.[1],v1=parts.find(([k])=>k==='v1')?.[1];
     if(!ANY_ORDER_ID.test(rawId||'')||!requestId||requestId.length>200||!/^\d{10,13}$/.test(ts||'')||!/^[a-f0-9]{64}$/.test(v1||''))throw new ShopError('Firma no válida.',401);
-    const expected=createHmac('sha256',secret).update(`id:${rawId};request-id:${requestId};ts:${ts};`).digest('hex');
-    const tsMs=ts.length<=10?Number(ts)*1000:Number(ts);
-    if(!same(v1,expected)||Math.abs(now()-tsMs)>5*60000)throw new ShopError('Firma no válida o vencida.',401);
+    const validSignature = [...new Set([rawId, rawId.toLowerCase()])]
+  .map(signedId => {
+    const expected = createHmac('sha256', secret)
+      .update(`id:${signedId};request-id:${requestId};ts:${ts};`)
+      .digest('hex');
+    return same(v1, expected);
+  })
+  .some(Boolean);
+
+const tsMs = ts.length <= 10 ? Number(ts) * 1000 : Number(ts);
+
+if (!validSignature || Math.abs(now() - tsMs) > 5 * 60000) {
+  throw new ShopError('Firma no válida o vencida.', 401);
+}
     const b=await body(r);
     if(!['order','orders','orders_v2'].includes(b.type)||String(b.data?.id).toUpperCase()!==id)throw new ShopError('Notificación no válida.',400);
     if(!ORDER_ID.test(id)||b.live_mode!==true||String(b.user_id)!==String(config.MERCADOPAGO_COLLECTOR_ID))throw new ShopError('La notificación no corresponde al entorno real de la tienda.',409);
