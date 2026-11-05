@@ -1,7 +1,7 @@
 import {livePaymentRuntime} from '../../lib/runtime.mjs';
 import {safe} from '../../lib/shop.mjs';
 
-export default async request => safe(async () => {
+const handleCheckout = async request => safe(async () => {
   const webhook =
     new URL(request.url).pathname === '/api/checkout/webhook';
 
@@ -30,5 +30,9 @@ export default async request => safe(async () => {
     throw error;
   }
 });
-
+export default async request => {
+  const response = await handleCheckout(request);
+  response.headers.set('X-Azul-Diagnostico', 'webhook-2');
+  return response;
+};
 export const config = {path:'/api/checkout/*'};
