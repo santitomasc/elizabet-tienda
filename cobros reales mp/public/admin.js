@@ -34,3 +34,49 @@ $('#productSearch').oninput=renderProducts;$('#visibilityFilter').onchange=rende
 function showLogin(message=''){$$('.view').forEach(v=>v.hidden=true);$('#loadState').hidden=false;$('#logoutBtn').hidden=true;$('#viewTitle').textContent='Tu marca, en tus manos.';$('#viewSubtitle').textContent='Ingresá para actualizar fotos, precios y productos.';$('#loadState').innerHTML=`<div class="login-card"><div class="eyebrow">ACCESO A MI TIENDA</div><h2>Hola de nuevo.</h2><p>Entrá con el usuario y contraseña de tu marca.</p><form id="loginForm"><label>Usuario<input name="user" autocomplete="username" required maxlength="100"></label><label>Contraseña<input name="password" type="password" autocomplete="current-password" required maxlength="200"></label><p id="loginError" class="form-error" role="alert">${esc(message)}</p><button class="btn primary" type="submit">Ingresar a mi tienda ↗</button></form><small>Si olvidaste tu acceso, pedile a quien administra el sitio que lo restablezca desde Netlify.</small></div>`;$('#loginForm').onsubmit=async e=>{e.preventDefault();const form=e.target,btn=form.querySelector('button');btn.disabled=true;$('#loginError').textContent='';try{const r=await fetch('/api/auth/login',send('POST',Object.fromEntries(new FormData(form))));const result=r.headers.get('content-type')?.includes('json')?await r.json():{error:r.status===429?'Esperá un minuto y volvé a intentar.':'No pudimos conectar.'};if(!r.ok)throw new Error(result.error);await load()}catch(e){$('#loginError').textContent=e.message;btn.disabled=false}}}
 $('#logoutBtn').onclick=async()=>{try{await fetch('/api/auth/logout',{method:'POST'});showLogin();toast('Sesión cerrada.')}catch(e){toast('No pudimos cerrar la sesión. Volvé a intentar.')}};
 load().catch(e=>{if(e.status===401)showLogin();else{$$('.view').forEach(v=>v.hidden=true);$('#loadState').innerHTML=`<h2>Falta terminar la configuración.</h2><p>${esc(e.message)}</p><p>Consultá la guía incluida en el proyecto de Netlify.</p><button class="btn primary" onclick="location.reload()">Volver a intentar</button>`}});
+// Mostrar u ocultar la contraseña del acceso al panel.
+(() => {
+  function agregarOjito() {
+    const form = document.getElementById('loginForm');
+    const campo = form?.querySelector('input[name="password"]');
+
+    if (!campo || form.querySelector('#verPassword')) return;
+
+    const boton = document.createElement('button');
+    boton.id = 'verPassword';
+    boton.type = 'button';
+    boton.className = 'btn secondary';
+    boton.textContent = '👁 Mostrar contraseña';
+    boton.setAttribute('aria-pressed', 'false');
+    boton.style.marginBottom = '16px';
+
+    boton.onclick = () => {
+      const mostrar = campo.type === 'password';
+      campo.type = mostrar ? 'text' : 'password';
+      boton.textContent = mostrar
+        ? 'Ocultar contraseña'
+        : '👁 Mostrar contraseña';
+      boton.setAttribute('aria-pressed', String(mostrar));
+    };
+
+    // Lo colocamos después de Ingresar para conservar el botón
+    // que utiliza el código existente al enviar el formulario.
+    form.appendChild(boton);
+
+    form.addEventListener('submit', () => {
+      campo.type = 'password';
+      boton.textContent = '👁 Mostrar contraseña';
+      boton.setAttribute('aria-pressed', 'false');
+    });
+  }
+
+  const contenedor = document.getElementById('loadState');
+  if (contenedor) {
+    new MutationObserver(agregarOjito).observe(contenedor, {
+      childList: true,
+      subtree: true
+    });
+  }
+
+  agregarOjito();
+})();
