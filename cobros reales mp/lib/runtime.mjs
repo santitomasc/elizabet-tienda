@@ -1,3 +1,4 @@
+import {createBackup} from './backup.mjs';
 import {createLivePayments} from './live-payments.mjs';
 import {getStore,getDeployStore} from '@netlify/blobs';
 import {deployContext} from './deploy-context.mjs';
@@ -7,3 +8,16 @@ export function runtime(){const preview=!['production','local'].includes(deployC
 export function paymentRuntime(){const preview=!['production','local'].includes(deployContext);const records=preview?getDeployStore({name:'elizabet-registros-v1',consistency:'strong'}):getStore({name:'elizabet-registros-v1',consistency:'strong'});const shop=runtime();return createPaymentPractice({records,config:process.env,listProducts:async()=> (await (await shop.catalog()).json()).products});}
 
 export function livePaymentRuntime(){const shop=runtime();const records=deployContext==='production'?getStore({name:'elizabet-registros-v1',consistency:'strong'}):getDeployStore({name:'elizabet-registros-v1',consistency:'strong'});return createLivePayments({records,inventory:shop.inventory,settings:shop.settings,config:process.env,environment:deployContext});}
+
+export function backupRuntime() {
+  const preview = !['production','local'].includes(deployContext);
+  const store = name => preview
+    ? getDeployStore({name, consistency:'strong'})
+    : getStore({name, consistency:'strong'});
+  return createBackup({
+    records:store('elizabet-registros-v1'),
+    photos:store('elizabet-fotos-v1'),
+    config:process.env,
+    environment:deployContext
+  });
+}

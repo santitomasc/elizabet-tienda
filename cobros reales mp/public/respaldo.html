@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="es-AR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer">
+<title>Respaldo · AZUL bendito</title><link rel="icon" href="/azul-favicon.svg">
+<link rel="stylesheet" href="/admin.css">
+<style>body{background:#f5f7f6;color:#192c52}main{max-width:720px;margin:48px auto;padding:28px;background:#fffef9;border:1px solid #d4e4e5;border-radius:16px}h1{font-family:Georgia,serif;font-size:36px}p{line-height:1.7}.actions{display:flex;flex-wrap:wrap;gap:16px;margin:24px 0}.note{background:#e6f2ef;padding:16px;border-radius:8px}label{display:block;margin:24px 0}input[type=file]{display:block;margin-top:12px;max-width:100%}#status,#validation{white-space:pre-wrap;overflow-wrap:anywhere}a{color:inherit}[hidden]{display:none!important}@media(max-width:760px){main{margin:16px}}</style>
+</head>
+<body><main>
+<a href="/admin">← Volver al panel</a>
+<h1>Respaldo de tu tienda</h1>
+<p>Descargá una copia de tus productos, stock, pedidos, configuración y fotos cargadas desde el panel. Necesitás tener la sesión iniciada.</p>
+<p class="note">La copia contiene datos privados de tus clientes y referencias de pagos. Guardala en una carpeta privada y una segunda ubicación protegida. No la subas a GitHub ni la compartas por enlaces públicos.</p>
+<div class="actions"><button class="btn primary" id="download" type="button">Descargar respaldo completo</button><button class="btn secondary" id="cancel" type="button" hidden>Cancelar</button></div>
+<p id="status" role="status" aria-live="polite"></p>
+<p>Es una copia manual: no se ejecuta automáticamente. Descargala al finalizar tu jornada y antes de hacer cambios importantes. Si la tienda cambia durante la descarga, te pediremos repetirla. Para catálogos grandes, solicitá una exportación asistida.</p>
+<hr><h2>Comprobar una copia</h2>
+<p>Elegí el archivo descargado para comprobar su integridad. Se revisa en este navegador, sin subirlo ni modificar la tienda.</p>
+<label>Archivo de respaldo<input id="file" type="file" accept=".json,application/json"></label>
+<p id="validation" role="status" aria-live="polite"></p>
+<p>Para recuperar datos, contactá a quien administra el sitio. Primero se comprueba la copia en almacenes separados; esta pantalla nunca sobrescribe la tienda.</p>
+<p>El código y las imágenes incluidas en el proyecto se conservan por separado en GitHub. Esta copia no incluye contraseñas ni variables de Netlify.</p>
+</main><script type="module" src="/backup.js?v=1"></script></body></html>
