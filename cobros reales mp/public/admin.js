@@ -157,6 +157,30 @@ function showLogin(message = '') {
       $('#loginError').textContent = error.message;
       btn.disabled = false;
     }
-  };
-}=async()=>{try{await fetch('/api/auth/logout',{method:'POST'});showLogin();toast('Sesión cerrada.')}catch(e){toast('No pudimos cerrar la sesión. Volvé a intentar.')}};
-load().catch(e=>{if(e.status===401)showLogin();else{$$('.view').forEach(v=>v.hidden=true);$('#loadState').innerHTML=`<h2>Falta terminar la configuración.</h2><p>${esc(e.message)}</p><p>Consultá la guía incluida en el proyecto de Netlify.</p><button class="btn primary" onclick="location.reload()">Volver a intentar</button>`}});
+ }
+
+$('#logoutBtn').onclick = async () => {
+  try {
+    await fetch('/api/auth/logout', {method: 'POST'});
+    showLogin();
+    toast('Sesión cerrada.');
+  } catch (error) {
+    toast('No pudimos cerrar la sesión. Volvé a intentar.');
+  }
+};
+
+load().catch(e => {
+  if (e.status === 401) {
+    showLogin();
+  } else {
+    $$('.view').forEach(v => v.hidden = true);
+    $('#loadState').innerHTML = `
+      <h2>Falta terminar la configuración.</h2>
+      <p>${esc(e.message)}</p>
+      <p>Consultá la guía incluida en el proyecto de Netlify.</p>
+      <button class="btn primary" onclick="location.reload()">
+        Volver a intentar
+      </button>
+    `;
+  }
+});
