@@ -30,6 +30,133 @@ document.addEventListener('click',async e=>{
 });
 document.addEventListener('click',async e=>{const v=e.target.closest('[data-view]');if(v&&!$('#loadState').hidden)return;if(v)setView(v.dataset.view);if(e.target.closest('#newProductBtn,#emptyNewProduct'))editProduct();const edit=e.target.closest('[data-edit]');if(edit)editProduct(edit.dataset.edit);const del=e.target.closest('[data-delete]');if(del){const p=data.products.find(p=>p.id===del.dataset.delete);confirm('¿Eliminar esta prenda?',`“${p.name}” dejará de aparecer en tu colección. Esta acción no cambia pedidos ya recibidos.`,async()=>{await api('products/'+p.id,send('DELETE',{revision:p.revision}));await load();toast('Producto eliminado.')})}const close=e.target.closest('[data-close]');if(close){if(close.dataset.close==='productEditor')closeEditor();else document.getElementById(close.dataset.close).close()}if(e.target.closest('#cancelProduct'))closeEditor();const remove=e.target.closest('[data-photo-remove]');if(remove){photos.splice(+remove.dataset.photoRemove,1);dirty=true;renderPhotos()}const left=e.target.closest('[data-photo-left]'),right=e.target.closest('[data-photo-right]');if(left||right){const i=+(left?left.dataset.photoLeft:right.dataset.photoRight),j=i+(left?-1:1);if(j>=0&&j<photos.length){[photos[i],photos[j]]=[photos[j],photos[i]];dirty=true;renderPhotos()}}const preset=e.target.closest('[data-preset]');if(preset){readVariants();const valid=variants.filter(v=>v.size.trim());for(const size of preset.dataset.preset.split(',')){if(!valid.some(v=>v.size.toUpperCase()===size.toUpperCase()))valid.push({size,stock:1})}variants=valid;dirty=true;renderVariants()}if(e.target.closest('#addVariant')){readVariants();if(variants.length>=20){toast('Podés agregar hasta 20 talles.');return}variants.push({size:'',stock:1});dirty=true;renderVariants()}const rmv=e.target.closest('[data-remove-variant]');if(rmv){readVariants();variants.splice(+rmv.dataset.removeVariant,1);dirty=true;renderVariants()}const ord=e.target.closest('[data-order]');if(ord)openOrder(ord.dataset.order);const saveOrder=e.target.closest('[data-save-order]');if(saveOrder){saveOrder.disabled=true;try{await api('orders/'+saveOrder.dataset.saveOrder,send('PUT',{status:$('#orderStatus').value,previousStatus:data.orders.find(o=>o.id===saveOrder.dataset.saveOrder).status}));$('#orderDialog').close();await load();toast('Estado del pedido actualizado.')}catch(e){toast(e.message);saveOrder.disabled=false}}});
 $('#productSearch').oninput=renderProducts;$('#visibilityFilter').onchange=renderProducts;$('#orderFilter').onchange=renderOrders;$('#photoInput').onchange=e=>upload(Array.from(e.target.files||[]));$('#productForm').addEventListener('input',()=>dirty=true);$('#productForm').onsubmit=e=>{e.preventDefault();saveProduct(e.target)};$('#settingsForm').onsubmit=e=>{e.preventDefault();saveSettings(e.target)};$('#refreshOrders').onclick=async e=>{e.target.disabled=true;try{await load();toast('Pedidos actualizados.')}catch(e){toast(e.message)}finally{$('#refreshOrders').disabled=false}};$('#confirmCancel').onclick=()=>$('#confirmDialog').close();$('#confirmAccept').onclick=async()=>{const action=confirmAction;$('#confirmAccept').disabled=true;try{await action();$('#confirmDialog').close()}catch(e){toast(e.message)}finally{$('#confirmAccept').disabled=false}};$('#productEditor').addEventListener('cancel',e=>{e.preventDefault();closeEditor()});window.addEventListener('beforeunload',e=>{if($('#productEditor').open&&dirty){e.preventDefault();e.returnValue=''}});
-function showLogin(message=''){$$('.view').forEach(v=>v.hidden=true);$('#loadState').hidden=false;$('#logoutBtn').hidden=true;$('#viewTitle').textContent='Tu marca, en tus manos.';$('#viewSubtitle').textContent='Ingresá para actualizar fotos, precios y productos.';$('#loadState').innerHTML=`<div class="login-card"><div class="eyebrow">ACCESO A MI TIENDA</div><h2>Hola de nuevo.</h2><p>Entrá con el usuario y contraseña de tu marca.</p><form id="loginForm"><label>Usuario<input name="user" autocomplete="username" required maxlength="100"></label><label>Contraseña<input name="password" type="password" autocomplete="current-password" required maxlength="200"></label><p id="loginError" class="form-error" role="alert">${esc(message)}</p><button class="btn primary" type="submit">Ingresar a mi tienda ↗</button></form><small>Si olvidaste tu acceso, pedile a quien administra el sitio que lo restablezca desde Netlify.</small></div>`;$('#loginForm').onsubmit=async e=>{e.preventDefault();const form=e.target,btn=form.querySelector('button');btn.disabled=true;$('#loginError').textContent='';try{const r=await fetch('/api/auth/login',send('POST',Object.fromEntries(new FormData(form))));const result=r.headers.get('content-type')?.includes('json')?await r.json():{error:r.status===429?'Esperá un minuto y volvé a intentar.':'No pudimos conectar.'};if(!r.ok)throw new Error(result.error);await load()}catch(e){$('#loginError').textContent=e.message;btn.disabled=false}}}
-$('#logoutBtn').onclick=async()=>{try{await fetch('/api/auth/logout',{method:'POST'});showLogin();toast('Sesión cerrada.')}catch(e){toast('No pudimos cerrar la sesión. Volvé a intentar.')}};
+function showLogin(message = '') {
+  $$('.view').forEach(v => v.hidden = true);
+  $('#loadState').hidden = false;
+  $('#logoutBtn').hidden = true;
+  $('#viewTitle').textContent = 'Tu marca, en tus manos.';
+  $('#viewSubtitle').textContent =
+    'Ingresá para actualizar fotos, precios y productos.';
+
+  $('#loadState').innerHTML = `
+    <div class="login-card">
+      <div class="eyebrow">ACCESO A MI TIENDA</div>
+      <h2>Hola de nuevo.</h2>
+      <p>Entrá con el usuario y contraseña de tu marca.</p>
+
+      <form id="loginForm">
+        <label>
+          Usuario
+          <input name="user" autocomplete="username"
+                 required maxlength="100">
+        </label>
+
+        <label for="loginPassword">Contraseña</label>
+        <div style="position:relative">
+          <input
+            id="loginPassword"
+            name="password"
+            type="password"
+            autocomplete="current-password"
+            required
+            maxlength="200"
+            style="width:100%;box-sizing:border-box;padding-right:58px"
+          >
+          <button
+            id="togglePassword"
+            type="button"
+            aria-label="Mostrar contraseña"
+            aria-controls="loginPassword"
+            aria-pressed="false"
+            title="Mostrar contraseña"
+            style="position:absolute;right:4px;top:50%;
+                   transform:translateY(-50%);width:44px;height:44px;
+                   display:grid;place-items:center;padding:0;
+                   border:0;border-radius:8px;background:transparent;
+                   color:#192c52;cursor:pointer"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor" stroke-width="1.8"
+                 aria-hidden="true" focusable="false">
+              <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/>
+              <circle cx="12" cy="12" r="3"/>
+              <path id="passwordEyeSlash" d="M3 3l18 18"
+                    style="display:none"/>
+            </svg>
+          </button>
+        </div>
+
+        <p id="loginError" class="form-error" role="alert">
+          ${esc(message)}
+        </p>
+        <button class="btn primary" type="submit">
+          Ingresar a mi tienda ↗
+        </button>
+      </form>
+
+      <small>
+        Si olvidaste tu acceso, pedile a quien administra el sitio
+        que lo restablezca desde Netlify.
+      </small>
+    </div>
+  `;
+
+  const password = $('#loginPassword');
+  const toggle = $('#togglePassword');
+
+  function hidePassword() {
+    password.type = 'password';
+    toggle.setAttribute('aria-pressed', 'false');
+    toggle.setAttribute('aria-label', 'Mostrar contraseña');
+    toggle.title = 'Mostrar contraseña';
+    $('#passwordEyeSlash').style.display = 'none';
+  }
+
+  toggle.onclick = () => {
+    if (password.type === 'text') {
+      hidePassword();
+    } else {
+      password.type = 'text';
+      toggle.setAttribute('aria-pressed', 'true');
+      toggle.setAttribute('aria-label', 'Ocultar contraseña');
+      toggle.title = 'Ocultar contraseña';
+      $('#passwordEyeSlash').style.display = '';
+    }
+  };
+
+  $('#loginForm').onsubmit = async e => {
+    e.preventDefault();
+
+    const form = e.target;
+    const btn = form.querySelector('button[type="submit"]');
+
+    hidePassword();
+    btn.disabled = true;
+    $('#loginError').textContent = '';
+
+    try {
+      const r = await fetch(
+        '/api/auth/login',
+        send('POST', Object.fromEntries(new FormData(form)))
+      );
+
+      const result = r.headers.get('content-type')?.includes('json')
+        ? await r.json()
+        : {
+            error: r.status === 429
+              ? 'Esperá un minuto y volvé a intentar.'
+              : 'No pudimos conectar.'
+          };
+
+      if (!r.ok) {
+        throw new Error(result.error || 'No pudimos iniciar sesión.');
+      }
+
+      await load();
+    } catch (error) {
+      $('#loginError').textContent = error.message;
+      btn.disabled = false;
+    }
+  };
+}=async()=>{try{await fetch('/api/auth/logout',{method:'POST'});showLogin();toast('Sesión cerrada.')}catch(e){toast('No pudimos cerrar la sesión. Volvé a intentar.')}};
 load().catch(e=>{if(e.status===401)showLogin();else{$$('.view').forEach(v=>v.hidden=true);$('#loadState').innerHTML=`<h2>Falta terminar la configuración.</h2><p>${esc(e.message)}</p><p>Consultá la guía incluida en el proyecto de Netlify.</p><button class="btn primary" onclick="location.reload()">Volver a intentar</button>`}});
