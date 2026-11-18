@@ -4,3 +4,11 @@
 
 .variant-row input{min-width:0;width:100%}
 @media(max-width:420px){.variant-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 28px}.variant-row label:first-child{grid-column:1/-1}}
+
+#variantTones { min-width: 0; margin: 12px 0 0; padding: 8px 10px; }
+#variantTones[hidden] { display: none; }
+.variant-tone { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.variant-tone label { display: flex; align-items: center; gap: 8px; margin: 0; }
+.variant-tone input[type="checkbox"] { flex: none; width: auto; margin: 0; }
+.variant-tone input[type="color"] { flex: none; width: 44px; height: 36px; padding: 3px; }
+.variant-tone input:disabled { opacity: .45; }
