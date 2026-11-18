@@ -1,3 +1,4 @@
+import {sameVariant,validVariantColor} from './variants.mjs';
 import {createHash} from 'node:crypto';
 import {sessionUser} from './auth.mjs';
 import {ShopError, json, originCheck} from './shop.mjs';
@@ -72,19 +73,19 @@ export function createPaymentPractice({records, config, listProducts, fetcher = 
     if (!Array.isArray(input) || !input.length || input.length > 50) throw new ShopError('Agregá prendas al carrito para probar el pago.');
     const merged = new Map();
     for (const item of input) {
-      if (!item || typeof item.id !== 'string' || item.id.length > 80 || typeof item.size !== 'string' || item.size.length > 15 || !Number.isInteger(item.qty) || item.qty < 1 || item.qty > 20) throw new ShopError('Revisá las cantidades y los talles del carrito.');
-      const key = JSON.stringify([item.id, item.size]);
+      if (!item || !validVariantColor(item.color) || typeof item.id !== 'string' || item.id.length > 80 || typeof item.size !== 'string' || item.size.length > 15 || !Number.isInteger(item.qty) || item.qty < 1 || item.qty > 20) throw new ShopError('Revisá las cantidades y los talles del carrito.');
+      const key = JSON.stringify([item.id, item.size, item.color || '']);
       const old = merged.get(key);
-      if (old) old.qty += item.qty; else merged.set(key, {id: item.id, size: item.size, qty: item.qty});
+      if (old) old.qty += item.qty; else merged.set(key, {id: item.id, size: item.size, ...(item.color ? {color:item.color} : {}), qty: item.qty});
     }
     const products = await listProducts();
     return [...merged.values()].map(item => {
       const product = products.find(p => p.id === item.id && p.active);
-      const variant = product?.variants.find(v => v.size === item.size);
+      const variant = product?.variants.find(v => sameVariant(v, item));
       if (!product || !variant || item.qty > 20 || variant.stock < item.qty) throw new ShopError('Una prenda o cantidad ya no está disponible. Actualizá la tienda y revisá el carrito.', 409);
       if (!Number.isSafeInteger(product.price) || product.price < 1 || product.price > 100000000) throw new ShopError('Revisá el precio del producto en el panel.');
       return {...item, name: product.name, price: product.price};
-    }).sort((a,b) => JSON.stringify([a.id,a.size]).localeCompare(JSON.stringify([b.id,b.size])));
+    }).sort((a,b) => JSON.stringify([a.id,a.size,a.color||'']).localeCompare(JSON.stringify([b.id,b.size,b.color||''])));
   }
   async function checkout(request) {
     authorized(request); originCheck(request);
@@ -101,7 +102,7 @@ export function createPaymentPractice({records, config, listProducts, fetcher = 
     if (!claim.modified) return reuse(await records.get(key, {type:'json'}), fingerprint);
     const back = base + '/practica.html?ensayo=' + record.id;
     const preference = await mp('/checkout/preferences', {method:'POST', body:JSON.stringify({
-      items:items.map(i => ({id:i.id + ':' + i.size, title:'PRUEBA · ' + i.name + ' · Talle ' + i.size, quantity:i.qty, currency_id:'ARS', unit_price:i.price})),
+      items:items.map(i => ({id:JSON.stringify([i.id,i.size,i.color||'']), title:'PRUEBA · ' + i.name + ' · Talle ' + i.size + (i.color ? ' · ' + i.color : ''), quantity:i.qty, currency_id:'ARS', unit_price:i.price})),
       external_reference:'ELZ-PRACTICA-' + record.id,
       back_urls:{success:back, failure:back, pending:back}, auto_return:'approved',
       expires:true, expiration_date_to:new Date(Date.now()+3600000).toISOString(),
