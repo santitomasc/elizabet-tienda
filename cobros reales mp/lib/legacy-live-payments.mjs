@@ -1,3 +1,4 @@
+import {sameVariant} from './variants.mjs';
 import {createHash, createHmac, timingSafeEqual} from 'node:crypto';
 import {ShopError, json, originCheck} from './shop.mjs';
 import {sessionUser} from './auth.mjs';
@@ -87,8 +88,8 @@ export function createLivePayments({records, inventory, settings, config, enviro
         if(approved.length>1)current.review='Se detectó más de un pago aprobado para este pedido. Revisá los cobros y devolvé el duplicado desde Mercado Pago.';
         if(partial)current.review='Hay una devolución parcial. Revisá los movimientos de Mercado Pago antes de entregar.';
         if(!current.stockHeld){
-          const enough=current.items.every(i=>{const p=data.products.find(p=>p.id===i.id),v=p?.variants.find(v=>v.size===i.size);return p?.active&&!p.sample&&v?.stock>=i.qty;});
-          if(enough){for(const i of current.items){const p=data.products.find(p=>p.id===i.id);p.variants.find(v=>v.size===i.size).stock-=i.qty;p.revision=(p.revision||0)+1;}current.stockHeld=true;data.orders[id].deducted=true;data.orders[id].status='Nuevo';}
+          const enough=current.items.every(i=>{const p=data.products.find(p=>p.id===i.id),v=p?.variants.find(v=>sameVariant(v, i));return p?.active&&!p.sample&&v?.stock>=i.qty;});
+          if(enough){for(const i of current.items){const p=data.products.find(p=>p.id===i.id);p.variants.find(v=>sameVariant(v, i)).stock-=i.qty;p.revision=(p.revision||0)+1;}current.stockHeld=true;data.orders[id].deducted=true;data.orders[id].status='Nuevo';}
           else current.review='El pago se aprobó después de vencer la reserva y ya no hay stock. No entregues el pedido: contactá a la compradora y gestioná una devolución en Mercado Pago.';
         }
       }else if(partial){current.everPaid=true;current.paymentStatus='review';current.review='Devolución parcial: verificá el importe y la entrega en Mercado Pago.';}
@@ -121,8 +122,8 @@ export function createLivePayments({records, inventory, settings, config, enviro
       if(o.preference_id){const p=await mp('/checkout/preferences/'+encodeURIComponent(o.preference_id));if(p.external_reference!==reference(id)||String(p.collector_id)!==o.seller||p.expires!==true||!Number.isFinite(Date.parse(p.expiration_date_to))||Date.parse(p.expiration_date_to)>now())throw new ShopError('El enlace de pago aún está vigente. Conservamos la reserva.',409);}
       await inventory.change(data=>{
         const current=data.checkouts[id];if(current.everPaid||Object.values(current.payments).some(p=>waiting.has(p.status)))return;
-        if(current.stockHeld){for(const i of current.items){const p=data.products.find(p=>p.id===i.id),v=p?.variants.find(v=>v.size===i.size);if(!v||v.stock+i.qty>10000)throw new ShopError('Revisá el stock antes de liberar esta reserva.',409);}
-          for(const i of current.items){const p=data.products.find(p=>p.id===i.id);p.variants.find(v=>v.size===i.size).stock+=i.qty;p.revision=(p.revision||0)+1;}current.stockHeld=false;data.orders[id].deducted=false;}
+        if(current.stockHeld){for(const i of current.items){const p=data.products.find(p=>p.id===i.id),v=p?.variants.find(v=>sameVariant(v, i));if(!v||v.stock+i.qty>10000)throw new ShopError('Revisá el stock antes de liberar esta reserva.',409);}
+          for(const i of current.items){const p=data.products.find(p=>p.id===i.id);p.variants.find(v=>sameVariant(v, i)).stock+=i.qty;p.revision=(p.revision||0)+1;}current.stockHeld=false;data.orders[id].deducted=false;}
         current.paymentStatus='expired';data.orders[id].status='Cancelado';
       });
     }

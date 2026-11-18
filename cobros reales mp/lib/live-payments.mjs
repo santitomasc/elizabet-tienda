@@ -1,3 +1,4 @@
+import {sameVariant,validVariantColor} from './variants.mjs';
 import {createLivePayments as createLegacyPayments} from './legacy-live-payments.mjs';
 import {createHash, createHmac, timingSafeEqual, randomUUID} from 'node:crypto';
 import {ShopError, json, originCheck} from './shop.mjs';
@@ -95,8 +96,8 @@ throw e;
     if(!['Retiro','Envío'].includes(delivery)||delivery==='Retiro'&&!s.pickup||delivery==='Envío'&&!s.delivery||delivery==='Envío'&&address.length<5)throw new ShopError('Revisá la forma de entrega y la dirección.');
     if(!Array.isArray(b.items)||!b.items.length||b.items.length>30)throw new ShopError('Revisá las prendas del carrito.');
     const merged=new Map();
-    for(const i of b.items){if(!UUID.test(i.id||'')||typeof i.size!=='string'||!i.size.trim()||i.size.length>15||!Number.isInteger(i.qty)||i.qty<1||i.qty>20)throw new ShopError('Revisá los talles y cantidades del carrito.');const key=i.id+'|'+i.size;merged.set(key,{id:i.id,size:i.size,qty:(merged.get(key)?.qty||0)+i.qty});}
-    const items=[...merged.values()].sort((a,b)=>(a.id+a.size).localeCompare(b.id+b.size));
+    for(const i of b.items){if(!i||!validVariantColor(i.color)||!UUID.test(i.id||'')||typeof i.size!=='string'||!i.size.trim()||i.size.length>15||!Number.isInteger(i.qty)||i.qty<1||i.qty>20)throw new ShopError('Revisá los talles y cantidades del carrito.');const key=JSON.stringify([i.id,i.size,i.color||'']);merged.set(key,{id:i.id,size:i.size,...(i.color?{color:i.color}:{}),qty:(merged.get(key)?.qty||0)+i.qty});}
+    const items=[...merged.values()].sort((a,b)=>(a.id+a.size).localeCompare(b.id+b.size)||(a.color||'').localeCompare(b.color||''));
     if(items.some(i=>i.qty>20))throw new ShopError('Podés comprar hasta 20 unidades por talle.');
     return {customer,phone,email,delivery,address,note,items};
   }
@@ -114,10 +115,10 @@ throw e;
       data.checkouts||={};existing=data.checkouts[b.key];
       if(existing){if(existing.fingerprint!==fingerprint)throw new ShopError('La selección cambió.',409);return {created:false,order:existing};}
       if(Object.keys(data.checkouts).length>=1500)throw new ShopError('La tienda necesita archivar sus pedidos. Consultá por WhatsApp.',503);
-      const items=v.items.map(i=>{const p=data.products.find(p=>p.id===i.id),variant=p?.variants.find(x=>x.size===i.size);if(!p?.active||p.sample||!variant||variant.stock<i.qty)throw new ShopError('No hay stock suficiente para una de las prendas. Actualizá el carrito.',409);return {...i,name:p.name,price:p.price,photo:p.photos[0]};});
+      const items=v.items.map(i=>{const p=data.products.find(p=>p.id===i.id),variant=p?.variants.find(x=>sameVariant(x, i));if(!p?.active||p.sample||!variant||variant.stock<i.qty)throw new ShopError('No hay stock suficiente para una de las prendas. Actualizá el carrito.',409);return {...i,name:p.name,price:p.price,photo:p.photos[0]};});
       const total=items.reduce((sum,i)=>sum+i.price*i.qty,0);if(!Number.isSafeInteger(total)||total<1||total>100000000)throw new ShopError('Revisá el total de la selección.');
       const o={id:b.key,code:'AZUL-'+b.key.slice(0,8).toUpperCase(),...v,items,total,fingerprint,seller:collector,created_at:new Date(stamp).toISOString(),expires_at:new Date(stamp+30*60000).toISOString(),api:'orders',cancel_key:randomUUID(),paymentStatus:'creating',stockHeld:true,payments:{},last_checked:stamp};
-      for(const i of items){const p=data.products.find(p=>p.id===i.id);p.variants.find(v=>v.size===i.size).stock-=i.qty;p.revision=(p.revision||0)+1;p.updated_at=new Date(stamp).toISOString();}
+      for(const i of items){const p=data.products.find(p=>p.id===i.id);p.variants.find(v=>sameVariant(v, i)).stock-=i.qty;p.revision=(p.revision||0)+1;p.updated_at=new Date(stamp).toISOString();}
       data.checkouts[o.id]=o;data.orders[o.id]={status:'Nuevo',deducted:true,legacy:false,items,paymentManaged:true};return {created:true,order:o};
     });
     if(!claimed.created)return json(result(claimed.order));
@@ -149,7 +150,7 @@ throw e;
       type:'online',processing_mode:'manual',capture_mode:'automatic',
       total_amount:o.total.toFixed(2),external_reference:reference(o.id),expiration_time:'PT30M',
       payer:{email:o.email},
-      items:o.items.map(i=>({external_code:createHash('sha256').update(i.id+':'+i.size).digest('hex').slice(0,30),title:(i.name+' · Talle '+i.size).slice(0,120),quantity:i.qty,unit_price:i.price.toFixed(2)})),
+      items:o.items.map(i=>({external_code:createHash('sha256').update(i.color?JSON.stringify([i.id,i.size,i.color]):i.id+':'+i.size).digest('hex').slice(0,30),title:((i.color?i.color+' · ':'')+'Talle '+i.size+' · '+i.name).slice(0,120),quantity:i.qty,unit_price:i.price.toFixed(2)})),
       config:{online:{success_url:back,failure_url:back,pending_url:back,auto_return:'approved'},
         payment_method:{not_allowed_types:['ticket','atm','bank_transfer']}}
     };
@@ -204,8 +205,8 @@ throw e;
         if(fromWebhook)current.payment_notified=true;
         current.paymentStatus=current.payment_notified?'approved':confirming;
         if(!current.stockHeld){
-          const enough=current.items.every(i=>{const product=data.products.find(p=>p.id===i.id),v=product?.variants.find(v=>v.size===i.size);return product?.active&&!product.sample&&v?.stock>=i.qty;});
-          if(enough){for(const i of current.items){const product=data.products.find(p=>p.id===i.id);product.variants.find(v=>v.size===i.size).stock-=i.qty;product.revision=(product.revision||0)+1;}current.stockHeld=true;data.orders[id].deducted=true;data.orders[id].status='Nuevo';}
+          const enough=current.items.every(i=>{const product=data.products.find(p=>p.id===i.id),v=product?.variants.find(v=>sameVariant(v, i));return product?.active&&!product.sample&&v?.stock>=i.qty;});
+          if(enough){for(const i of current.items){const product=data.products.find(p=>p.id===i.id);product.variants.find(v=>sameVariant(v, i)).stock-=i.qty;product.revision=(product.revision||0)+1;}current.stockHeld=true;data.orders[id].deducted=true;data.orders[id].status='Nuevo';}
           else current.review='El pago llegó después de liberar la reserva y ya no hay stock. No entregues el pedido: contactá a la compradora y gestioná la devolución en Mercado Pago.';
         }
       }else if(current.everPaid&&!['refunded','charged_back','review'].includes(next.status)){
@@ -237,8 +238,8 @@ throw e;
       const current=data.checkouts[o.id];
       if(current.everPaid||!['canceled','expired','failed'].includes(current.provider_status))return;
       if(current.stockHeld){
-        for(const i of current.items){const product=data.products.find(p=>p.id===i.id),v=product?.variants.find(v=>v.size===i.size);if(!v||v.stock+i.qty>10000)throw new ShopError('Revisá las cantidades antes de liberar la reserva.',409);}
-        for(const i of current.items){const product=data.products.find(p=>p.id===i.id);product.variants.find(v=>v.size===i.size).stock+=i.qty;product.revision=(product.revision||0)+1;}
+        for(const i of current.items){const product=data.products.find(p=>p.id===i.id),v=product?.variants.find(v=>sameVariant(v, i));if(!v||v.stock+i.qty>10000)throw new ShopError('Revisá las cantidades antes de liberar la reserva.',409);}
+        for(const i of current.items){const product=data.products.find(p=>p.id===i.id);product.variants.find(v=>sameVariant(v, i)).stock+=i.qty;product.revision=(product.revision||0)+1;}
         current.stockHeld=false;data.orders[o.id].deducted=false;
       }
      current.paymentStatus = current.provider_status === 'failed'

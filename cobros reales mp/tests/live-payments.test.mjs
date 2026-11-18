@@ -82,3 +82,29 @@ test('Receipts need their private proof, ignore URL status and numeric payment I
 test('A late approval cannot oversell a reservation already given to another buyer',async()=>{
  const f=await fixture({stock:1}),a=(await f.create()).data;f.advance(46*60000);await f.service.reconcile(a.id);await f.create();await f.notify(await f.update(a));const o=await f.stored(a.id);assert.equal(o.stockHeld,false);assert.match(o.review,/ya no hay stock/);assert.equal(await f.stockLeft(),0);
 });
+
+test('Same size in different colors reserves each stock separately and rejects unlisted combinations', async () => {
+  const f = await fixture();
+  await f.shop.inventory.change(data => {
+    data.products[0].variants = [
+      {size:'5',color:'Blanco',stock:1},
+      {size:'5',color:'Lila',stock:2},
+      {size:'6',color:'Negro',stock:1}
+    ];
+  });
+  const selection = (size,color) => ({id:f.product.id,size,color,qty:1});
+  assert.equal((await f.create(f.body(undefined,{items:[selection('5','Negro')]}))).status,409);
+  const attempt = f.body(undefined,{items:[selection('5','Blanco'),selection('5','Lila')]});
+  const result = await f.create(attempt);
+  assert.equal(result.status,201);
+  assert.deepEqual((await f.stored(attempt.key)).items.map(i=>i.color),['Blanco','Lila']);
+  assert.deepEqual((await f.shop.inventory.products())[0].variants.map(v=>v.stock),[0,1,1]);
+  const posted = JSON.parse(f.seen.find(x=>x.path==='/v1/orders'&&x.options.method==='POST').options.body);
+  assert.notEqual(posted.items[0].external_code,posted.items[1].external_code);
+  assert.match(posted.items[0].title,/Blanco/);
+  assert.equal((await f.create(attempt)).status,200);
+  assert.deepEqual((await f.shop.inventory.products())[0].variants.map(v=>v.stock),[0,1,1]);
+  f.advance(46*60000);
+  await f.service.reconcile(attempt.key);
+  assert.deepEqual((await f.shop.inventory.products())[0].variants.map(v=>v.stock),[1,2,1]);
+});

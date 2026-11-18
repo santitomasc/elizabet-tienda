@@ -1,3 +1,4 @@
+import {sameVariant} from './variants.mjs';
 // Product quantities and order movements share one conditional write, so a sale
 // can never deduct half a basket or overwrite another simultaneous sale.
 export function createInventory(records, migrate, fail) {
@@ -37,7 +38,7 @@ export function createInventory(records, migrate, fail) {
         if (!old) throw fail('El producto ya no existe.', 404);
         checkRevision(old, revision);
         for (const order of pending(data, id)) for (const item of order.items.filter(i => i.id === id)) {
-          if (!product.variants.some(v => v.size === item.size)) throw fail('Ese talle tiene ventas confirmadas. Conservá el talle con stock 0 para permitir una cancelación.');
+          if (!product.variants.some(v => sameVariant(v, item))) throw fail('Ese talle tiene ventas confirmadas. Conservá el talle con stock 0 para permitir una cancelación.');
         }
         const next = {...product, id, revision: old.revision || 0}; revise(next);
         data.products[index] = next; return next;
@@ -70,13 +71,13 @@ export function createInventory(records, migrate, fail) {
         if (!old.legacy && deduct !== old.deducted) {
           for (const item of old.items) {
             const product = data.products.find(p => p.id === item.id);
-            const variant = product?.variants.find(v => v.size === item.size);
+            const variant = product?.variants.find(v => sameVariant(v, item));
             if (!variant || deduct && (!product.active || product.sample || variant.stock < item.qty)) throw fail(`No hay stock suficiente de ${item.name}, talle ${item.size}.`, 409);
             if (!deduct && variant.stock + item.qty > 10000) throw fail('Revisá el stock de la prenda antes de cancelar.', 409);
           }
           for (const item of old.items) {
             const product = data.products.find(p => p.id === item.id);
-            product.variants.find(v => v.size === item.size).stock += deduct ? -item.qty : item.qty;
+            product.variants.find(v => sameVariant(v, item)).stock += deduct ? -item.qty : item.qty;
             revise(product);
           }
           next.deducted = deduct;

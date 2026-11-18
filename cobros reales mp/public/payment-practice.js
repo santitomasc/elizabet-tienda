@@ -78,7 +78,7 @@
         $('#practiceError').textContent = '';
         button.textContent = 'Preparando…';
         try {
-          const result = await api('/api/practice/checkout', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({key:practiceKey, items:cart.map(({id,size,qty}) => ({id,size,qty}))})});
+          const result = await api('/api/practice/checkout', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({key:practiceKey, items:cart.map(({id,size,color,qty}) => ({id,size,...(color?{color}:{}),qty}))})});
           showLink(result, true);
         } catch (e) {
           $('#practiceError').textContent = e.message;
