@@ -23,6 +23,7 @@
  };
  if(settings.brand)brand();
  const sections=window.AzulSections;
+ filter='Novedades';
  const previousProducts=renderProducts;
  const garment='<svg viewBox="0 0 32 32" aria-hidden="true"><path d="m11 6-7 4 3 7 4-2v12h10V15l4 2 3-7-7-4c-1 4-9 4-10 0Z"/></svg>';
  const covers={
@@ -48,14 +49,25 @@
   rail.scrollLeft=scroll;
   if(focused)Array.from(rail.querySelectorAll('[data-filter]')).find(b=>b.dataset.filter===focused)?.focus({preventScroll:true});
   $$('.catalog-tabs [data-filter]').forEach(b=>{const active=b.dataset.filter===filter;b.classList.toggle('selected',active);b.setAttribute('aria-pressed',String(active));});
-  $('#activeSectionLabel').textContent=filter==='Todas'?'Toda la colección':filter;
+  const isNew=filter==='Novedades';
+  $('#activeSectionLabel').textContent=isNew?'Recién llegados':filter==='Todas'?'Toda la colección':filter;
+  $('#newArrivalsBadge').hidden=!isNew;
+  $('#catalogDescription').textContent=isNew?'Descubrí las últimas prendas de Azul Bendito.':filter==='Todas'?'Encontrá tu próxima prenda favorita.':'Elegí lo que va con vos.';
  };
  renderProducts=function(){
   const source=products;products=source.map(p=>({...p,category:sections.categoryFor(p)}));
-  try{previousProducts();if(sections.items.includes(filter)&&!products.some(p=>p.category===filter)&&!search)$('#products').innerHTML='<div class="empty-results"><h3>Muy pronto, más '+esc(filter.toLowerCase())+'.</h3><p>Mientras tanto, encontrá tus favoritos en las otras secciones.</p><button class="underlined" id="resetFilters">Ver toda la colección ↗</button></div>';}
+  try{previousProducts();if(sections.items.includes(filter)&&!products.some(p=>p.category===filter)&&!search)$('#products').innerHTML='<div class="empty-results"><h3>Muy pronto, más '+esc(filter.toLowerCase())+'.</h3><p>Mientras tanto, encontrá tus favoritos en las otras secciones.</p><button class="underlined" id="resetFilters">Ver toda la colección ↗</button></div>';
+   $$('#products .tag').forEach(tag=>tag.classList.toggle('new-arrival-tag',tag.textContent==='NUEVO'));
+  }
   finally{products=source;}
  };
  document.addEventListener('click',e=>{const button=e.target.closest('[data-sections-scroll]');if(button)$('#filters').scrollBy({left:Number(button.dataset.sectionsScroll)*Math.max(200,$('#filters').clientWidth*.72),behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});});
+ document.addEventListener('click',e=>{
+  if(e.target.closest('.collection-actions [data-filter]')){
+   $('#catalogResults').scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth',block:'start'});
+   $('#catalogResults').focus({preventScroll:true});
+  }
+ });
  if(products.length)renderProducts();
  const slides=[
   {heading:'Tu estilo.<br>Tu libertad.<br><em>Tu azul.</em>',description:'Prendas para sentirte cómoda, linda y vos.<br>Todos los estilos. Sin dejar de ser quien sos.',image:'/assets/azul-modelo-frente.webp',alt:'Modelo de AZUL bendito con remera blanca de manga larga y pantalón negro',position:'50% 15%',caption:'AZUL BENDITO · NUESTRA ESENCIA',label:'UN MAR DE POSIBILIDADES',link:'Descubrí la colección'},
