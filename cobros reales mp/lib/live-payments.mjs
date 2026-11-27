@@ -14,10 +14,13 @@ const same = (a, b) => {const x=Buffer.from(String(a)), y=Buffer.from(String(b))
 const reference = id => 'AZUL-' + id;
 const labels = {confirming:'Pago detectado · esperando notificación',creating:'Preparando pago',awaiting:'Esperando pago',approved:'Pago aprobado',pending:'Pago pendiente',in_process:'Pago en revisión',authorized:'Pago sin capturar',in_mediation:'Pago en mediación',rejected:'Pago rechazado',cancelled:'Pago cancelado',expired:'Enlace vencido',refunded:'Pago devuelto',charged_back:'Contracargo',review:'Requiere revisión',uncertain:'Verificar enlace'};
 export function paymentLabel(status) {return labels[status] || 'Verificar pago';}
+// Orders reports an expired checkout as canceled/expired. Keep old records
+// readable without rewriting historical orders just to correct their label.
+const displayStatus = o => o.paymentStatus === 'cancelled' && o.provider_status === 'canceled' && o.provider_status_detail === 'expired' ? 'expired' : o.paymentStatus;
 export function liveOrderProjection(order, movement) {
   const {fingerprint, url, payments, seller, preference_id, cancel_key, create_payload, ...visible} = order;
-  return {...visible, status:movement?.status || 'Nuevo', stockDeducted:!!movement?.deducted,
-    paymentManaged:true, paymentLabel:paymentLabel(order.paymentStatus), paymentIds:Object.keys(payments||{}),
+  return {...visible, paymentStatus:displayStatus(order), status:movement?.status || 'Nuevo', stockDeducted:!!movement?.deducted,
+    paymentManaged:true, paymentLabel:paymentLabel(displayStatus(order)), paymentIds:Object.keys(payments||{}),
     canFulfill:order.paymentStatus==='approved' && order.stockHeld && !order.review,
     paymentNote:order.review || (order.paymentStatus==='confirming'?'El cobro fue detectado por la API. Falta recibir la notificación auténtica de Mercado Pago antes de preparar o entregar.':'') || (order.everPaid && order.paymentStatus!=='approved' ? 'Revisá el cobro en Mercado Pago. No se repone stock automáticamente por una devolución o contracargo.' : '')};
 }
@@ -101,7 +104,7 @@ throw e;
     if(items.some(i=>i.qty>20))throw new ShopError('Podés comprar hasta 20 unidades por talle.');
     return {customer,phone,email,delivery,address,note,items};
   }
-  function result(o) {return {id:o.id,code:o.code,total:o.total,url:!o.everPaid&&!o.review&&!['rejected','expired','cancelled'].includes(o.paymentStatus)&&now()<Date.parse(o.expires_at)?o.url||null:null,proof:proof(o),paymentStatus:o.paymentStatus,expires_at:o.expires_at};}
+  function result(o) {return {id:o.id,code:o.code,total:o.total,url:!o.everPaid&&!o.review&&!['rejected','expired','cancelled'].includes(o.paymentStatus)&&now()<Date.parse(o.expires_at)?o.url||null:null,proof:proof(o),paymentStatus:displayStatus(o),expires_at:o.expires_at};}
   async function create(r) {
     originCheck(r);ready();
     if(!enabled())throw new ShopError('Los pagos online todavía no están habilitados.',409);
@@ -179,7 +182,7 @@ throw e;
       return {status:'approved',paidBefore:true};
     }
     if(paid>0)return {status:'review',paidBefore:true,review:'Se informó dinero acreditado con otro estado. Verificá el cobro antes de entregar.'};
-    const statuses={created:'awaiting',processing:'in_process',action_required:'authorized',failed:'rejected',canceled:'cancelled',expired:'expired'};
+    const statuses={created:'awaiting',processing:'in_process',action_required:'authorized',failed:'rejected',canceled:p.status_detail==='expired'?'expired':'cancelled',expired:'expired'};
     return {status:statuses[p.status]||'review',review:statuses[p.status]?undefined:'Mercado Pago informó un estado nuevo. Revisá el pedido antes de entregar.'};
   }
   async function applyOrder(p,{expectedId,fromWebhook=false}={}) {
@@ -212,7 +215,12 @@ throw e;
       }else if(current.everPaid&&!['refunded','charged_back','review'].includes(next.status)){
         current.paymentStatus='review';current.review='Cambió el estado de un cobro previamente detectado. Revisá Mercado Pago antes de entregar.';
       }else current.paymentStatus=next.status;
-    });return true;
+    });
+    // A validated terminal webhook can release its reservation immediately.
+    // release rechecks the latest record atomically, including any racing payment.
+    const current=await getOrder(id);
+    if(!current.everPaid&&!current.review&&['canceled','expired','failed'].includes(current.provider_status))await release(current);
+    return true;
   }
   async function providerOrder(id,o) {
     if(!ORDER_ID.test(id||''))throw new ShopError('Número de orden no válido.',400);
@@ -236,7 +244,7 @@ throw e;
   async function release(o) {
     return inventory.change(data=>{
       const current=data.checkouts[o.id];
-      if(current.everPaid||!['canceled','expired','failed'].includes(current.provider_status))return;
+      if(current.everPaid||current.review||!['canceled','expired','failed'].includes(current.provider_status))return;
       if(current.stockHeld){
         for(const i of current.items){const product=data.products.find(p=>p.id===i.id),v=product?.variants.find(v=>sameVariant(v, i));if(!v||v.stock+i.qty>10000)throw new ShopError('Revisá las cantidades antes de liberar la reserva.',409);}
         for(const i of current.items){const product=data.products.find(p=>p.id===i.id);product.variants.find(v=>sameVariant(v, i)).stock+=i.qty;product.revision=(product.revision||0)+1;}
@@ -244,7 +252,7 @@ throw e;
       }
      current.paymentStatus = current.provider_status === 'failed'
   ? 'rejected'
-  : current.provider_status === 'canceled'
+  : current.provider_status === 'canceled' && current.provider_status_detail !== 'expired'
     ? 'cancelled'
     : 'expired';
 data.orders[o.id].status = 'Cancelado';
@@ -269,7 +277,7 @@ data.orders[o.id].status = 'Cancelado';
     return getOrder(id);
   }
   async function ownership(b) {ready();if(!UUID.test(b.key||''))throw new ShopError('No encontramos el pedido.',404);const o=await getOrder(b.key);if(!o||!same(b.proof||'',proof(o)))throw new ShopError('No encontramos el comprobante del pedido.',404);return o;}
-  function publicStatus(o) {return {...result(o),url:!o.everPaid&&!o.review&&!['expired','cancelled','rejected'].includes(o.paymentStatus)&&now()<Date.parse(o.expires_at)?o.url||null:null,label:paymentLabel(o.paymentStatus),paid:o.paymentStatus==='approved'&&o.stockHeld&&!o.review,review:!!o.review,delivery:o.delivery,shippingIncluded:false,retryAllowed:!o.everPaid&&!o.review&&!o.stockHeld&&['expired','cancelled','rejected'].includes(o.paymentStatus)};}
+  function publicStatus(o) {return {...result(o),url:!o.everPaid&&!o.review&&!['expired','cancelled','rejected'].includes(o.paymentStatus)&&now()<Date.parse(o.expires_at)?o.url||null:null,label:paymentLabel(displayStatus(o)),paid:o.paymentStatus==='approved'&&o.stockHeld&&!o.review,reserved:!!o.stockHeld&&!o.everPaid&&!o.review,review:!!o.review,delivery:o.delivery,shippingIncluded:false,retryAllowed:!o.everPaid&&!o.review&&!o.stockHeld&&['expired','cancelled','rejected'].includes(o.paymentStatus)};}
   async function webhook(r) {
     ready();deadline=Date.now()+18000;
     const u=new URL(r.url),rawId=u.searchParams.get('data.id'),requestId=r.headers.get('x-request-id')?.trim(),signature=r.headers.get('x-signature')||'';
@@ -299,7 +307,7 @@ if (!validSignature || Math.abs(now() - tsMs) > 5 * 60000) {
   }
   async function sweep() {
     if(!available())return {checked:0};deadline=Date.now()+22000;
-    const orders=Object.values((await inventory.snapshot()).data.checkouts||{}).filter(o=>o.paymentStatus!=='expired').sort((a,b)=>(a.last_checked||0)-(b.last_checked||0)).slice(0,3);
+    const orders=Object.values((await inventory.snapshot()).data.checkouts||{}).filter(o=>o.paymentStatus!=='expired'||o.stockHeld).sort((a,b)=>(a.last_checked||0)-(b.last_checked||0)).slice(0,3);
     const results=await Promise.allSettled(orders.map(o=>reconcile(o.id)));return {checked:orders.length,failed:results.filter(r=>r.status==='rejected').length};
   }
   async function handle(r) {

@@ -50,8 +50,8 @@
       'No se confirmó el cobro. Podés continuar si el enlace sigue vigente.'
     ],
     expired: [
-      'Esta orden de pago se cerró.',
-      'La reserva se liberó. Volvé a la colección para consultar disponibilidad antes de iniciar otra compra.'
+      'El enlace de pago venció.',
+      'Consultá el estado de la reserva antes de iniciar otra compra.'
     ],
     refunded: [
       'El pago fue devuelto.',
@@ -80,14 +80,17 @@
 
   function show(data) {
     if (data.retryAllowed) {
-      try {
-        sessionStorage.removeItem('azul-checkout-request');
-      } catch {}
+      window.AzulCheckoutRecovery?.retire(key);
     }
+    $('retryPurchase').hidden = !data.retryAllowed || !!data.review || !!data.paid;
 
     let copy = messages[data.paymentStatus] || [
       'Tu pago necesita revisión.',
       'Consultá a la tienda antes de volver a pagar.'
+    ];
+    if (data.paymentStatus === 'expired' && data.retryAllowed) copy = [
+      'El enlace de pago venció.',
+      'La reserva se liberó. Podés volver a intentar la compra; comprobaremos nuevamente la disponibilidad.'
     ];
 
     if (data.review) {
@@ -191,7 +194,7 @@
           localStorage.removeItem('elizabet-cart-v2');
         }
 
-        sessionStorage.removeItem('azul-checkout-request');
+        window.AzulCheckoutRecovery?.retire(key);
       } catch {}
     }
   }
